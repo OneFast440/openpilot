@@ -102,10 +102,7 @@ class ModelState:
     self.inputs['traffic_convention'][:] = inputs['traffic_convention']
     self.inputs['lateral_control_params'][:] = inputs['lateral_control_params']
 
-    a = self.frame.prepare(buf, transform.flatten(), self.model.getCLBuffer("input_imgs"))
-    print(a[:10], a[-10:])
-    self.model.setInputBuffer("input_imgs", a)
-    #print()
+    self.model.setInputBuffer("input_imgs", self.frame.prepare(buf, transform.flatten(), self.model.getCLBuffer("input_imgs")))
     if wbuf is not None:
       self.model.setInputBuffer("big_input_imgs", self.wide_frame.prepare(wbuf, transform_wide.flatten(), self.model.getCLBuffer("big_input_imgs")))
 
