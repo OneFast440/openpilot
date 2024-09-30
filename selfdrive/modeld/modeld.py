@@ -58,6 +58,7 @@ class ModelState:
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
     self.full_features_20Hz = np.zeros((ModelConstants.FULL_HISTORY_BUFFER_LEN, ModelConstants.FEATURE_LEN), dtype=np.float32)
     self.desire_20Hz =  np.zeros((ModelConstants.FULL_HISTORY_BUFFER_LEN + 1, ModelConstants.DESIRE_LEN), dtype=np.float32)
+    self.prev_desired_curv_20hz = np.zeros((ModelConstants.FULL_HISTORY_BUFFER_LEN + 1, ModelConstants.PREV_DESIRED_CURV_LEN), dtype=np.float32)
 
     # img buffers are managed in openCL transform code
     self.inputs = {
@@ -114,11 +115,14 @@ class ModelState:
 
     self.full_features_20Hz[:-1] = self.full_features_20Hz[1:]
     self.full_features_20Hz[-1] = outputs['hidden_state'][0, :]
+
+    self.prev_desired_curv_20hz[:-1] = self.prev_desired_curv_20hz[1:]
+    self.prev_desired_curv_20hz[-1] = outputs['desired_curvature'][0, :]
+
     idxs = np.arange(-4,-100,-4)[::-1]
     self.inputs['features_buffer'][:] = self.full_features_20Hz[idxs].flatten()
     # TODO model only uses last value now, once that changes we need to input strided action history buffer
-    self.inputs['prev_desired_curv'][:-ModelConstants.PREV_DESIRED_CURV_LEN] = self.inputs['prev_desired_curv'][ModelConstants.PREV_DESIRED_CURV_LEN:]
-    self.inputs['prev_desired_curv'][-ModelConstants.PREV_DESIRED_CURV_LEN:] = outputs['desired_curvature'][0, :]
+    self.inputs['prev_desired_curv'][-ModelConstants.PREV_DESIRED_CURV_LEN:] = self.prev_desired_curv_20hz[-4, :]
     return outputs
 
 
