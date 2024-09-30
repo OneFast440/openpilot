@@ -34,3 +34,4 @@ private:
   cl_command_queue q;
   cl_mem y_cl, u_cl, v_cl, net_input_cl;
   std::unique_ptr<uint8_t[]> input_frames;
+}
