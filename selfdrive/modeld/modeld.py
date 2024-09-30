@@ -34,9 +34,6 @@ MODEL_PATHS = {
 
 METADATA_PATH = Path(__file__).parent / 'models/supercombo_metadata.pkl'
 
-MODEL_WIDTH = 512
-MODEL_HEIGHT = 256
-MODEL_FRAME_SIZE = MODEL_WIDTH * MODEL_HEIGHT * 3 // 2
 
 class FrameMeta:
   frame_id: int = 0
@@ -61,6 +58,8 @@ class ModelState:
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
     self.full_features_20Hz = np.zeros((ModelConstants.FULL_HISTORY_BUFFER_LEN, ModelConstants.FEATURE_LEN), dtype=np.float32)
     self.desire_20Hz =  np.zeros((ModelConstants.FULL_HISTORY_BUFFER_LEN + 1, ModelConstants.DESIRE_LEN), dtype=np.float32)
+
+    # img buffers are managed in openCL transform code
     self.inputs = {
       'desire': np.zeros(ModelConstants.DESIRE_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32),
       'traffic_convention': np.zeros(ModelConstants.TRAFFIC_CONVENTION_LEN, dtype=np.float32),
@@ -68,11 +67,6 @@ class ModelState:
       'prev_desired_curv': np.zeros(ModelConstants.PREV_DESIRED_CURV_LEN * (ModelConstants.HISTORY_BUFFER_LEN+1), dtype=np.float32),
       'features_buffer': np.zeros(ModelConstants.HISTORY_BUFFER_LEN * ModelConstants.FEATURE_LEN, dtype=np.float32),
     }
-
-    self.input_imgs_20hz = np.zeros(MODEL_FRAME_SIZE*5, dtype=np.float32)
-    self.big_input_imgs_20hz = np.zeros(MODEL_FRAME_SIZE*5, dtype=np.float32)
-    self.input_imgs = np.zeros(MODEL_FRAME_SIZE*2, dtype=np.float32)
-    self.big_input_imgs = np.zeros(MODEL_FRAME_SIZE*2, dtype=np.float32)
 
     with open(METADATA_PATH, 'rb') as f:
       model_metadata = pickle.load(f)
@@ -108,20 +102,9 @@ class ModelState:
     self.inputs['traffic_convention'][:] = inputs['traffic_convention']
     self.inputs['lateral_control_params'][:] = inputs['lateral_control_params']
 
-    new_img = self.frame.prepare(buf, transform.flatten(), self.model.getCLBuffer("input_imgs"))
-    self.input_imgs_20hz[:-MODEL_FRAME_SIZE] = self.input_imgs_20hz[MODEL_FRAME_SIZE:]
-    self.input_imgs_20hz[-MODEL_FRAME_SIZE:] = new_img
-    self.input_imgs[:MODEL_FRAME_SIZE] = self.input_imgs_20hz[:MODEL_FRAME_SIZE]
-    self.input_imgs[MODEL_FRAME_SIZE:] = self.input_imgs_20hz[-MODEL_FRAME_SIZE:]
-    self.model.setInputBuffer("input_imgs", self.input_imgs)
+    self.model.setInputBuffer("input_imgs", self.frame.prepare(buf, transform.flatten(), self.model.getCLBuffer("input_imgs")))
     if wbuf is not None:
-      new_big_img = self.wide_frame.prepare(wbuf, transform_wide.flatten(), self.model.getCLBuffer("big_input_imgs"))
-      self.big_input_imgs_20hz[:-MODEL_FRAME_SIZE] = self.big_input_imgs_20hz[MODEL_FRAME_SIZE:]
-      self.big_input_imgs_20hz[-MODEL_FRAME_SIZE:] = new_big_img
-      self.big_input_imgs[:MODEL_FRAME_SIZE] = self.big_input_imgs_20hz[:MODEL_FRAME_SIZE]
-      self.big_input_imgs[MODEL_FRAME_SIZE:] = self.big_input_imgs_20hz[-MODEL_FRAME_SIZE:]
-      self.model.setInputBuffer("big_input_imgs", self.big_input_imgs)
-
+      self.model.setInputBuffer("big_input_imgs", self.wide_frame.prepare(wbuf, transform_wide.flatten(), self.model.getCLBuffer("big_input_imgs")))
 
     if prepare_only:
       return None
@@ -298,6 +281,8 @@ def main(demo=False):
       DH.update(sm['carState'], sm['carControl'].latActive, lane_change_prob)
       modelv2_send.modelV2.meta.laneChangeState = DH.lane_change_state
       modelv2_send.modelV2.meta.laneChangeDirection = DH.lane_change_direction
+      drivingdata_send.drivingModelData.meta.laneChangeState = DH.lane_change_state
+      drivingdata_send.drivingModelData.meta.laneChangeDirection = DH.lane_change_direction
 
       fill_pose_msg(posenet_send, model_output, meta_main.frame_id, vipc_dropped_frames, meta_main.timestamp_eof, live_calib_seen)
       pm.send('modelV2', modelv2_send)
