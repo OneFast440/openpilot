@@ -27,7 +27,9 @@ uint8_t* ModelFrame::prepare(cl_mem yuv_cl, int frame_width, int frame_height, i
                 yuv_cl, frame_width, frame_height, frame_stride, frame_uv_offset,
                 y_cl, u_cl, v_cl, MODEL_WIDTH, MODEL_HEIGHT, projection);
 
-  copy_queue(&loadyuv, q, img_buffer_20hz_cl, img_buffer_20hz_cl, 0, frame_size_bytes, 4*frame_size_bytes);
+  for (int i = 0; i < 4; i++) {
+    CL_CHECK(clEnqueueCopyBuffer(q, img_buffer_20hz_cl, img_buffer_20hz_cl, (i+1)*frame_size_bytes, i*frame_size_bytes, frame_size_bytes, 0, nullptr, nullptr));
+  }
   loadyuv_queue(&loadyuv, q, y_cl, u_cl, v_cl, last_img_cl);
   if (output == NULL) {
     CL_CHECK(clEnqueueReadBuffer(q, img_buffer_20hz_cl, CL_TRUE, 0, frame_size_bytes, &input_frames[0], 0, nullptr, nullptr));
@@ -47,6 +49,7 @@ uint8_t* ModelFrame::prepare(cl_mem yuv_cl, int frame_width, int frame_height, i
 ModelFrame::~ModelFrame() {
   transform_destroy(&transform);
   loadyuv_destroy(&loadyuv);
+  CL_CHECK(clReleaseMemObject(img_buffer_20hz_cl));
   CL_CHECK(clReleaseMemObject(last_img_cl));
   CL_CHECK(clReleaseMemObject(v_cl));
   CL_CHECK(clReleaseMemObject(u_cl));
