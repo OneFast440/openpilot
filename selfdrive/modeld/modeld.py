@@ -180,7 +180,7 @@ def main(demo=False):
   cloudlog.info("modeld got CarParams: %s", CP.carName)
 
   # TODO this needs more thought, use .2s extra for now to estimate other delays
-  steer_delay = CP.steerActuatorDelay + .2
+  steer_delay = CP.steerActuatorDelay + .0
 
   DH = DesireHelper()
 
