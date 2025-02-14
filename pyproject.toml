@@ -111,6 +111,8 @@ dev = [
   "tabulate",
   "types-requests",
   "types-tabulate",
+  "raylib @ https://github.com/commaai/raylib-python-cffi/releases/download/wheel/raylib-5.5.0.2-cp312-cp312-linux_x86_64.whl ; (platform_machine == 'x86_64' and platform_system == 'Linux' and python_version == '3.12')",
+  "raylib @ https://github.com/commaai/raylib-python-cffi/releases/download/wheel/raylib-5.5.0.2-cp311-cp311-linux_x86_64.whl ; (platform_machine == 'x86_64' and platform_system == 'Linux' and python_version == '3.11')",
 ]
 
 tools = [
@@ -164,7 +166,7 @@ testpaths = [
 [tool.codespell]
 quiet-level = 3
 # if you've got a short variable name that's getting flagged, add it here
-ignore-words-list = "bu,ro,te,ue,alo,hda,ois,nam,nams,ned,som,parm,setts,inout,warmup,bumb,nd,sie,preints,whit,indexIn,ws,uint,grey,deque,stdio,amin,BA,LITE,atEnd,UIs,errorString,arange,FocusIn,od,tim,relA,hist,copyable,jupyter,thead"
+ignore-words-list = "bu,ro,te,ue,alo,hda,ois,nam,nams,ned,som,parm,setts,inout,warmup,bumb,nd,sie,preints,whit,indexIn,ws,uint,grey,deque,stdio,amin,BA,LITE,atEnd,UIs,errorString,arange,FocusIn,od,tim,relA,hist,copyable,jupyter,thead,TGE,abl"
 builtin = "clear,rare,informal,code,names,en-GB_to_en-US"
 skip = "./third_party/*, ./tinygrad/*, ./tinygrad_repo/*, ./msgq/*, ./panda/*, ./opendbc/*, ./opendbc_repo/*, ./rednose/*, ./rednose_repo/*, ./teleoprtc/*, ./teleoprtc_repo/*, *.ts, uv.lock, *.onnx, ./cereal/gen/*, */c_generated_code/*"
 
