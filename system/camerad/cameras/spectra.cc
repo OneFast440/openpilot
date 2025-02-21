@@ -241,7 +241,7 @@ SpectraCamera::SpectraCamera(SpectraMaster *master, const CameraConfig &config, 
     output_type(out) {
   mm.init(m->video0_fd);
 
-  ife_buf_depth = (out != ISP_IFE_PROCESSED) ? 4 : VIPC_BUFFER_COUNT;
+  ife_buf_depth = (out == ISP_RAW_OUTPUT) ? 4 : VIPC_BUFFER_COUNT;
   assert(ife_buf_depth < MAX_IFE_BUFS);
 }
 
@@ -259,7 +259,7 @@ int SpectraCamera::clear_req_queue() {
   int ret = do_cam_control(m->video0_fd, CAM_REQ_MGR_FLUSH_REQ, &req_mgr_flush_request, sizeof(req_mgr_flush_request));
   LOGD("flushed all req: %d", ret);
 
-  if (icp_dev_handle) {
+  if (icp_dev_handle > 0) {
     struct cam_flush_dev_cmd cmd = {
       .session_handle = session_handle,
       .dev_handle = icp_dev_handle,
@@ -1401,7 +1401,7 @@ void SpectraCamera::handle_camera_event(const cam_req_mgr_message *event_data) {
     request_id_last = request_id;
 
     uint64_t timestamp = event_data->u.frame_msg.timestamp;  // this is timestamped in the kernel's SOF IRQ callback
-    if (syncFirstFrame(cc.camera_num, frame_id_raw, timestamp)) {
+    if (syncFirstFrame(cc.camera_num, request_id, frame_id_raw, timestamp)) {
       auto &meta_data = buf.frame_metadata[buf_idx];
       meta_data.frame_id = frame_id_raw - camera_sync_data[cc.camera_num].frame_id_offset;
       meta_data.request_id = request_id;
@@ -1409,9 +1409,11 @@ void SpectraCamera::handle_camera_event(const cam_req_mgr_message *event_data) {
 
       // wait for this frame's EOF, then queue up the next one
       enqueue_req_multi(request_id + ife_buf_depth, 1, true);
+      //LOGW("camerad %d synced req %d fid %d, publishing ts %.2f cereal_frame_id %d", cc.camera_num, (int)request_id, (int)frame_id_raw, (double)(timestamp)*1e-6, meta_data.frame_id);
     } else {
       // Frames not yet synced
       enqueue_req_multi(request_id + ife_buf_depth, 1, false);
+      //LOGW("camerad %d not synced req %d fid %d", cc.camera_num, (int)request_id, (int)frame_id_raw);
     }
   } else { // not ready
     if (frame_id_raw > frame_id_raw_last + 10) {
@@ -1424,37 +1426,36 @@ void SpectraCamera::handle_camera_event(const cam_req_mgr_message *event_data) {
   }
 }
 
-bool SpectraCamera::syncFirstFrame(int camera_id, uint64_t raw_id, uint64_t timestamp) {
-  std::lock_guard lk(frame_sync_mutex);
-
+bool SpectraCamera::syncFirstFrame(int camera_id, uint64_t request_id, uint64_t raw_id, uint64_t timestamp) {
   if (first_frame_synced) return true;
 
+  // OX and OS cameras require a few frames for the FSIN to sync up
+  if (request_id < 3) {
+    return false;
+  }
+
   // Store the frame data for this camera
-  camera_sync_data[camera_id] = SyncData{raw_id, timestamp, raw_id + 1};
+  camera_sync_data[camera_id] = SyncData{timestamp, raw_id + 1};
 
   // Ensure all cameras are up
-  bool all_cams_up = true;
-  for (const auto& config : ALL_CAMERA_CONFIGS) {
-    if (camera_sync_data.find(config.camera_num) == camera_sync_data.end()) {
-      all_cams_up = false;
-    }
-  }
+  int enabled_camera_count = std::count_if(std::begin(ALL_CAMERA_CONFIGS), std::end(ALL_CAMERA_CONFIGS),
+                                           [](const auto &config) { return config.enabled; });
+  bool all_cams_up = camera_sync_data.size() == enabled_camera_count;
 
   // Wait until the timestamps line up
   bool all_cams_synced = true;
-  uint64_t reference_timestamp = camera_sync_data.begin()->second.timestamp;
   for (const auto &[_, sync_data] : camera_sync_data) {
-    uint64_t diff = std::max(reference_timestamp, sync_data.timestamp) -
-                    std::min(reference_timestamp, sync_data.timestamp);
-    if (diff > 2*1e6) {  // within 2ms
+    uint64_t diff = std::max(timestamp, sync_data.timestamp) -
+                    std::min(timestamp, sync_data.timestamp);
+    if (diff > 0.5*1e6) {  // within 0.5ms
       all_cams_synced = false;
     }
   }
 
   if (all_cams_up && all_cams_synced) {
     first_frame_synced = true;
-    for (auto &[cam, sync_data] : camera_sync_data) {
-      LOGW("camera %d synced on frame_id_offset %ld timestamp %lu", cam, camera_sync_data[cam].frame_id_offset, camera_sync_data[cam].timestamp);
+    for (const auto&[cam, sync_data] : camera_sync_data) {
+      LOGW("camera %d synced on frame_id_offset %ld timestamp %lu", cam, sync_data.frame_id_offset, sync_data.timestamp);
     }
   }
 
