@@ -1109,4 +1109,42 @@
     "title": "openpilot Version",
     "description": ""
   }
+  "PredictedCurvatureBlendRatio": {
+    "title": "Predicted Curvature Blend Ratio",
+    "description": "Blend ratio applied to predicted curvature. Adjust to change reliance on predicted curvature vs measured curvature.",
+    "min": 0.2,
+    "max": 0.6,
+    "step": 0.1
+  },
+  "LaneChangeFactor": {
+    "title": "Lane Change Factor",
+    "description": "Multiplier used during automated lane changes. Higher values increase aggressiveness.",
+    "min": 0.5,
+    "max": 1.0,
+    "step": 0.05
+  },
+  "HumanTurnReset": {
+    "title": "Human Turn Reset",
+    "description": "If enabled, a human steering input will reset the current automatic turn handling.",
+    "options": [
+      { "value": 0, "label": "Off" },
+      { "value": 1, "label": "On" }
+    ]
+  },
+  "EnableAdvancedLanePositioning": {
+    "title": "Enable Advanced Lane Positioning",
+    "description": "Enable advanced lane positioning features (experimental).",
+    "options": [
+      { "value": 0, "label": "Off" },
+      { "value": 1, "label": "On" }
+    ]
+  },
+  "EnableLanefullMode": {
+    "title": "Enable Lanefull Mode",
+    "description": "Enable lanefull mode (full-width lane behaviors).",
+    "options": [
+      { "value": 0, "label": "Off" },
+      { "value": 1, "label": "On" }
+    ]
+  }
 }
