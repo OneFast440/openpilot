@@ -59,8 +59,8 @@ def apply_creep_compensation(accel: float, v_ego: float) -> float:
 
 
 class CarController(CarControllerBase):
-  def __init__(self, dbc_names, CP):
-    super().__init__(dbc_names, CP)
+  def __init__(self, dbc_names, CP, CP_SP):
+    super().__init__(dbc_names, CP, CP_SP)
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
 
@@ -76,18 +76,18 @@ class CarController(CarControllerBase):
       self.sm = None
       self.has_model = False
     self.model = None
-
+    
     self.accel = 0.0
     self.gas = 0.0
     self.brake_request = False
-
+    
     self.main_on_last = False
     self.lkas_enabled_last = False
     self.steer_alert_last = False
     self.lead_distance_bars_last = None
     self.distance_bar_frame = 0
 
-  def update(self, CC, CS, now_nanos):
+  def update(self, CC, CC_SP, CS, now_nanos):
     can_sends = []
 
     if self.has_model and self.sm is not None:
@@ -97,6 +97,7 @@ class CarController(CarControllerBase):
 
     actuators = CC.actuators
     hud_control = CC.hudControl
+
     main_on = CS.out.cruiseState.available
     steer_alert = hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw)
     fcw_alert = hud_control.visualAlert == VisualAlert.fcw
@@ -115,6 +116,7 @@ class CarController(CarControllerBase):
 
     ### lateral control ###
     # send steer msg at 20Hz
+    
     apply_curvature = 0.0
     path_angle = 0.0
     path_offset = 0.0
