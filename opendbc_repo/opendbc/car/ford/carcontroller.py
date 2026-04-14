@@ -140,14 +140,15 @@ class CarController(CarControllerBase):
           d_c0 = float(np.interp(v_ego, [11., 14.], [d_look, 6.0]))
           path_offset = float(np.interp(d_c0, x_pts, np.array(self.model.position.y)))
 
-          path_angle = apply_std_steer_angle_limits(
-            path_angle, self.path_angle_last, v_ego, 0., CC.latActive, CarControllerParams.C1_RATE_LIMITS)
-
           ramp_type = 3
 
           apply_curvature = float(clip(apply_curvature, -0.02, 0.02))
           path_offset = float(clip(path_offset, -4.61, 4.60))
+          # Clip raw model value to DBC range before rate-limiting so the limiter
+          # tracks the clamped target, not the unbounded model prediction.
           path_angle = float(clip(path_angle, -0.475, 0.497))
+          path_angle = apply_std_steer_angle_limits(
+            path_angle, self.path_angle_last, v_ego, 0., CC.latActive, CarControllerParams.C1_RATE_LIMITS)
         else:
           # Non-CAN FD: curvature-only control (unchanged from upstream)
           # Bronco and some other cars consistently overshoot curv requests
