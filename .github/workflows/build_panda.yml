@@ -39,7 +39,9 @@ jobs:
       # The SConscript uses opendbc.INCLUDE_PATH as a C compiler include path.
       - name: Install custom opendbc package
         run: |
-          pip3 install -e opendbc_repo/
+          # Regular install (not editable) — copies headers into site-packages.
+          # INCLUDE_PATH resolves to site-packages/ where our updated ford.h lives.
+          pip3 install opendbc_repo/
           python3 -c "import opendbc; print('opendbc.INCLUDE_PATH:', opendbc.INCLUDE_PATH)"
           test -f "$(python3 -c 'import opendbc; print(opendbc.INCLUDE_PATH)')/opendbc/safety/modes/ford.h" \
             && echo "ford.h found via opendbc.INCLUDE_PATH" || exit 1
