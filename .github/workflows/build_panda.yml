@@ -7,7 +7,9 @@ on:
     branches: [dev, claude/brave-napier]
     paths:
       - 'opendbc_repo/opendbc/safety/modes/ford.h'
+      - 'opendbc_repo/opendbc/car/ford/**'
       - 'panda/board/**'
+      - '.github/workflows/build_panda.yml'
 
 jobs:
   build-panda-firmware:
@@ -50,30 +52,33 @@ jobs:
           # Verify the ford.h we want is accessible
           test -f panda/opendbc/safety/modes/ford.h && echo "ford.h found" || exit 1
 
-      # Build the panda H7 firmware in DEBUG mode (no signing cert needed)
+      # Build the panda H7 firmware in DEBUG mode.
+      # ALLOW_DEBUG=1 causes scons to sign the binary with panda/certs/debug instead of
+      # the release key, producing a valid panda_h7.bin.signed that the bootstub will
+      # accept when the bootstub was also compiled with ALLOW_DEBUG (DEV-unknown-DEBUG builds).
       - name: Build panda firmware
         run: |
           cd panda/board
           ALLOW_DEBUG=1 scons -u
+          echo "=== Build output ==="
+          ls -la obj/
 
-      # Verify the binary was produced
+      # Verify the signed binary was produced by scons
       - name: Verify build output
         run: |
-          ls -la panda/board/obj/panda_h7/main.bin
-          # Copy unsigned debug binary to the standard flashing location
-          cp panda/board/obj/panda_h7/main.bin \
-             panda/board/obj/panda_h7.bin.signed
+          ls -la panda/board/obj/panda_h7.bin.signed
+          ls -la panda/board/obj/bootstub.panda_h7.bin
 
       # Commit and push the updated binary back to your branch
       - name: Commit updated firmware binary
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "GitHub Actions [panda build]"
-          git add panda/board/obj/panda_h7/main.bin
           git add panda/board/obj/panda_h7.bin.signed
-          git add panda/board/obj/bootstub.panda_h7.bin 2>/dev/null || true
+          git add panda/board/obj/bootstub.panda_h7.bin
+          git add panda/board/obj/panda_h7/main.bin 2>/dev/null || true
           git add panda/board/obj/gitversion.h 2>/dev/null || true
           # Only commit if something changed
           git diff --staged --quiet && echo "Firmware unchanged" && exit 0
-          git commit -m "ci: rebuild panda firmware with updated ford.h c1/c0 safety code"
+          git commit -m "ci: rebuild panda firmware with ford.h c0/c1 safety support"
           git push

@@ -142,13 +142,23 @@ class CarController(CarControllerBase):
 
           ramp_type = 3
 
-          apply_curvature = float(clip(apply_curvature, -0.02, 0.02))
           path_offset = float(clip(path_offset, -4.61, 4.60))
           # Clip raw model value to DBC range before rate-limiting so the limiter
           # tracks the clamped target, not the unbounded model prediction.
           path_angle = float(clip(path_angle, -0.475, 0.497))
           path_angle = apply_std_steer_angle_limits(
             path_angle, self.path_angle_last, v_ego, 0., CC.latActive, CarControllerParams.C1_RATE_LIMITS)
+
+          # TODO: Re-enable c0/c1 once panda firmware is rebuilt with ford.h c0/c1 support.
+          # The current panda binary (sunnypilot/opendbc@master) blocks any message where
+          # raw_path_angle != FORD_INACTIVE_PATH_ANGLE or raw_path_offset != FORD_INACTIVE_PATH_OFFSET,
+          # causing the entire 0x3D6 frame to be dropped. The PSCM then misses its periodic
+          # update, times out, and faults (LatCtlSte_D_Stat → 0 → steerFaultTemporary).
+          path_angle = 0.0
+          path_offset = 0.0
+          current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
+          apply_curvature = apply_ford_curvature_limits(desired_curvature, self.apply_curvature_last, current_curvature,
+                                                        CS.out.vEgoRaw, 0., CC.latActive, self.CP)
         else:
           # Non-CAN FD: curvature-only control (unchanged from upstream)
           # Bronco and some other cars consistently overshoot curv requests
