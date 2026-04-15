@@ -48,6 +48,7 @@ jobs:
 
       # commaai/panda's SConstruct and SConscript live at the repo root, not board/.
       # Fetch both so we can build from panda/ as if it were the panda repo root.
+      # Then remove the tests/libpanda SConscript include — we only need the firmware.
       - name: Fetch SConstruct and SConscript from commaai/panda
         run: |
           curl -fsSL \
@@ -56,6 +57,17 @@ jobs:
           curl -fsSL \
             "https://raw.githubusercontent.com/commaai/panda/master/SConscript" \
             -o panda/SConscript
+          # Strip the libpanda test build — we only need the firmware binary
+          python3 - <<'EOF'
+          import re
+          with open("panda/SConscript", "r") as f:
+              content = f.read()
+          # Remove the SConscript call for tests/libpanda (and any similar test includes)
+          content = re.sub(r"SConscript\(['\"]tests/libpanda/SConscript['\"]\)[^\n]*\n?", "", content)
+          with open("panda/SConscript", "w") as f:
+              f.write(content)
+          print("Patched SConscript to skip test builds")
+          EOF
 
       # Build from panda/ (treated as panda repo root).
       # No RELEASE env var → DEBUG build, signed with board/certs/debug key.
