@@ -94,9 +94,10 @@ jobs:
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "GitHub Actions [panda build]"
-          git add panda/board/obj/panda_h7.bin.signed
-          git add panda/board/obj/bootstub.panda_h7.bin
-          git add panda/board/obj/gitversion.h 2>/dev/null || true
+          # panda/board/obj is gitignored; -f forces adding the committed binaries
+          git add -f panda/board/obj/panda_h7.bin.signed
+          git add -f panda/board/obj/bootstub.panda_h7.bin
+          git add -f panda/board/obj/gitversion.h 2>/dev/null || true
           # Only commit if something changed
           git diff --staged --quiet && echo "Firmware unchanged" && exit 0
           git commit -m "ci: rebuild panda firmware with ford.h c0/c1 safety support"
