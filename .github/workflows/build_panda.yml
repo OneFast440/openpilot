@@ -34,17 +34,15 @@ jobs:
             python3-pip
           pip3 install pycryptodome
 
-      # Install our custom opendbc package so opendbc.INCLUDE_PATH points to
-      # opendbc_repo/, which contains our updated ford.h with c0/c1 safety support.
-      # The SConscript uses opendbc.INCLUDE_PATH as a C compiler include path.
-      - name: Install custom opendbc package
+      # Verify our custom ford.h is present; PYTHONPATH will point scons at it
+      - name: Verify custom ford.h
         run: |
-          # Regular install (not editable) — copies headers into site-packages.
-          # INCLUDE_PATH resolves to site-packages/ where our updated ford.h lives.
-          pip3 install opendbc_repo/
-          python3 -c "import opendbc; print('opendbc.INCLUDE_PATH:', opendbc.INCLUDE_PATH)"
-          test -f "$(python3 -c 'import opendbc; print(opendbc.INCLUDE_PATH)')/opendbc/safety/modes/ford.h" \
-            && echo "ford.h found via opendbc.INCLUDE_PATH" || exit 1
+          test -f opendbc_repo/opendbc/safety/modes/ford.h \
+            && echo "ford.h found" || exit 1
+          # Quick sanity check: our new constants must be present
+          grep -q "FORD_MAX_PATH_ANGLE" opendbc_repo/opendbc/safety/modes/ford.h \
+            && echo "c0/c1 safety constants present" || \
+            (echo "ERROR: ford.h missing c0/c1 safety constants" && exit 1)
 
       # commaai/panda's SConstruct and SConscript live at the repo root, not board/.
       # Fetch both so we can build from panda/ as if it were the panda repo root.
@@ -64,8 +62,9 @@ jobs:
       - name: Build panda firmware
         run: |
           cd panda
-          # scons uses system Python; expose user site-packages so it can find opendbc
-          PYTHONPATH=$(python3 -m site --user-site):${PYTHONPATH:-} scons -u
+          # Add opendbc_repo to PYTHONPATH so the SConscript `import opendbc`
+          # resolves to our repo and opendbc.INCLUDE_PATH points at our ford.h.
+          PYTHONPATH="$GITHUB_WORKSPACE/opendbc_repo:${PYTHONPATH:-}" scons -u
           echo "=== Build output ==="
           ls -la board/obj/
 
