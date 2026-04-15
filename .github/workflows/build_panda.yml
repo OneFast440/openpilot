@@ -23,16 +23,18 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Install ARM cross-compiler, scons, and Python crypto for firmware signing
+      # Install ARM cross-compiler and Python tools for firmware signing
       - name: Install build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             gcc-arm-none-eabi \
             binutils-arm-none-eabi \
-            scons \
             python3-pip
-          pip3 install pycryptodome
+          # Install scons via pip to get a current version (Ubuntu 22.04 ships an
+          # older scons that lacks File.srcnode().relpath used in commaai SConscript)
+          pip3 install scons pycryptodome
+          scons --version
 
       # Verify our custom ford.h is present; PYTHONPATH will point scons at it
       - name: Verify custom ford.h
@@ -64,7 +66,8 @@ jobs:
           cd panda
           # Add opendbc_repo to PYTHONPATH so the SConscript `import opendbc`
           # resolves to our repo and opendbc.INCLUDE_PATH points at our ford.h.
-          PYTHONPATH="$GITHUB_WORKSPACE/opendbc_repo:${PYTHONPATH:-}" scons -u
+          # Use python3 -m SCons so it uses the same Python env where pip installed scons.
+          PYTHONPATH="$GITHUB_WORKSPACE/opendbc_repo:${PYTHONPATH:-}" python3 -m SCons -u
           echo "=== Build output ==="
           ls -la board/obj/
 
