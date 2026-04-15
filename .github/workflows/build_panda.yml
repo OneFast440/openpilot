@@ -1,13 +1,15 @@
 name: Build Panda Firmware
 
-# Trigger manually, or automatically when ford.h or panda board source changes
+# Trigger manually, or automatically when ford.h or related files change
 on:
   workflow_dispatch:
   push:
     branches: [dev, claude/brave-napier]
     paths:
       - 'opendbc_repo/opendbc/safety/modes/ford.h'
+      - 'opendbc_repo/opendbc/car/ford/**'
       - 'panda/board/**'
+      - '.github/workflows/build_panda.yml'
 
 jobs:
   build-panda-firmware:
@@ -21,59 +23,82 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # Install ARM cross-compiler and scons
+      # Install ARM cross-compiler and Python tools for firmware signing
       - name: Install build tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             gcc-arm-none-eabi \
             binutils-arm-none-eabi \
-            scons \
             python3-pip
-          pip3 install pycryptodome
+          # Install scons via pip to get a current version (Ubuntu 22.04 ships an
+          # older scons that lacks File.srcnode().relpath used in commaai SConscript)
+          pip3 install scons pycryptodome
+          scons --version
 
-      # The panda board C source is in panda/board/ but needs a SConstruct.
-      # Fetch it from commaai/panda master (the upstream this fork is based on).
-      - name: Fetch SConstruct from commaai/panda
+      # Verify our custom ford.h is present; PYTHONPATH will point scons at it
+      - name: Verify custom ford.h
+        run: |
+          test -f opendbc_repo/opendbc/safety/modes/ford.h \
+            && echo "ford.h found" || exit 1
+          # Quick sanity check: our new constants must be present
+          grep -q "FORD_MAX_PATH_ANGLE" opendbc_repo/opendbc/safety/modes/ford.h \
+            && echo "c0/c1 safety constants present" || \
+            (echo "ERROR: ford.h missing c0/c1 safety constants" && exit 1)
+
+      # commaai/panda's SConstruct and SConscript live at the repo root, not board/.
+      # Fetch both so we can build from panda/ as if it were the panda repo root.
+      # Then remove the tests/libpanda SConscript include — we only need the firmware.
+      - name: Fetch SConstruct and SConscript from commaai/panda
         run: |
           curl -fsSL \
-            "https://raw.githubusercontent.com/commaai/panda/master/board/SConstruct" \
-            -o panda/board/SConstruct
+            "https://raw.githubusercontent.com/commaai/panda/master/SConstruct" \
+            -o panda/SConstruct
+          curl -fsSL \
+            "https://raw.githubusercontent.com/commaai/panda/master/SConscript" \
+            -o panda/SConscript
+          # Strip the libpanda test build — we only need the firmware binary
+          python3 - <<'EOF'
+          import re
+          with open("panda/SConscript", "r") as f:
+              content = f.read()
+          # Remove the SConscript call for tests/libpanda (and any similar test includes)
+          content = re.sub(r"SConscript\(['\"]tests/libpanda/SConscript['\"]\)[^\n]*\n?", "", content)
+          with open("panda/SConscript", "w") as f:
+              f.write(content)
+          print("Patched SConscript to skip test builds")
+          EOF
 
-      # The panda firmware includes "opendbc/safety/safety.h".
-      # The SConstruct adds panda/ to the include path, so it looks for panda/opendbc/.
-      # Symlink panda/opendbc -> opendbc_repo/opendbc so it uses OUR updated ford.h.
-      - name: Wire up custom opendbc include path
-        run: |
-          ln -sf "$GITHUB_WORKSPACE/opendbc_repo/opendbc" \
-                 "$GITHUB_WORKSPACE/panda/opendbc"
-          # Verify the ford.h we want is accessible
-          test -f panda/opendbc/safety/modes/ford.h && echo "ford.h found" || exit 1
-
-      # Build the panda H7 firmware in DEBUG mode (no signing cert needed)
+      # Build from panda/ (treated as panda repo root).
+      # No RELEASE env var → DEBUG build, signed with board/certs/debug key.
+      # The resulting panda_h7.bin.signed is signed with the debug RSA key,
+      # which the bootstub accepts on DEV-unknown-DEBUG builds.
       - name: Build panda firmware
         run: |
-          cd panda/board
-          ALLOW_DEBUG=1 scons -u
+          cd panda
+          # Add opendbc_repo to PYTHONPATH so the SConscript `import opendbc`
+          # resolves to our repo and opendbc.INCLUDE_PATH points at our ford.h.
+          # Use python3 -m SCons so it uses the same Python env where pip installed scons.
+          PYTHONPATH="$GITHUB_WORKSPACE/opendbc_repo:${PYTHONPATH:-}" python3 -m SCons -u
+          echo "=== Build output ==="
+          ls -la board/obj/
 
-      # Verify the binary was produced
+      # Verify the signed binary was produced
       - name: Verify build output
         run: |
-          ls -la panda/board/obj/panda_h7/main.bin
-          # Copy unsigned debug binary to the standard flashing location
-          cp panda/board/obj/panda_h7/main.bin \
-             panda/board/obj/panda_h7.bin.signed
+          ls -la panda/board/obj/panda_h7.bin.signed
+          ls -la panda/board/obj/bootstub.panda_h7.bin
 
-      # Commit and push the updated binary back to your branch
+      # Commit and push the updated binaries back to the branch
       - name: Commit updated firmware binary
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "GitHub Actions [panda build]"
-          git add panda/board/obj/panda_h7/main.bin
-          git add panda/board/obj/panda_h7.bin.signed
-          git add panda/board/obj/bootstub.panda_h7.bin 2>/dev/null || true
-          git add panda/board/obj/gitversion.h 2>/dev/null || true
+          # panda/board/obj is gitignored; -f forces adding the committed binaries
+          git add -f panda/board/obj/panda_h7.bin.signed
+          git add -f panda/board/obj/bootstub.panda_h7.bin
+          git add -f panda/board/obj/gitversion.h 2>/dev/null || true
           # Only commit if something changed
           git diff --staged --quiet && echo "Firmware unchanged" && exit 0
-          git commit -m "ci: rebuild panda firmware with updated ford.h c1/c0 safety code"
+          git commit -m "ci: rebuild panda firmware with ford.h c0/c1 safety support"
           git push
