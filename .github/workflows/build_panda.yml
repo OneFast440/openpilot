@@ -64,7 +64,8 @@ jobs:
       - name: Build panda firmware
         run: |
           cd panda
-          scons -u
+          # scons uses system Python; expose user site-packages so it can find opendbc
+          PYTHONPATH=$(python3 -m site --user-site):${PYTHONPATH:-} scons -u
           echo "=== Build output ==="
           ls -la board/obj/
 
