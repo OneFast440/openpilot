@@ -305,6 +305,8 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
       violation |= (desired_path_angle != 0) || (desired_path_offset != 0);
     }
 
+    ford_desired_path_angle_last = violation ? 0 : desired_path_angle;
+
     if (violation) {
       tx = false;
     }
