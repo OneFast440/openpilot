@@ -262,7 +262,7 @@ class CarController(CarControllerBase):
       if path_angle_bias_updated:
         self.path_angle_bias_last = path_angle_bias
       else:
-          self.path_angle_bias_last = first_order_filter(0.0, self.path_angle_bias_last, CarControllerParams.C1_CENTERING_BIAS_TAU)
+        self.path_angle_bias_last = first_order_filter(0.0, self.path_angle_bias_last, CarControllerParams.C1_CENTERING_BIAS_TAU)
       self.curvature_target_last = curvature_target
       self.apply_curvature_last = apply_curvature
 
