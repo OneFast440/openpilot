@@ -236,7 +236,21 @@ class CarController(CarControllerBase):
             path_angle = apply_std_steer_angle_limits(
               path_angle, self.path_angle_last, v_ego, 0., canfd_lat_active, CarControllerParams.C1_RATE_LIMITS)
 
-            ramp_type = 3
+            # FIX 1: c2 must be ~0 when c0/c1 are handling the steering (mode=2 design intent,
+            # per ford.h comment "c2=0 always"). Sending full desired_curvature (c2) alongside
+            # model-derived path_angle (c1) double-counts the road curvature in the PSCM's path
+            # polynomial y(x)=c0+c1*x+c2*x²/2. On a curve the combined c1*x + c2*x²/2 term
+            # commands an excessively large lateral correction (e.g. 2+ m at 20m lookahead),
+            # causing the PSCM to hit its servo limit and fault → LatCtlSte_D_Stat=4 →
+            # steerFaultTemporary → steerTempUnavailable.
+            apply_curvature = 0.0
+
+            # FIX 2: avoid an immediate-ramp steering jerk on the standby→active transition.
+            # ramp_type=3 (Immediate) while PSCM is still in standby (state=1) causes a sudden
+            # step command that can fault the PSCM. Switch to Immediate only once the PSCM
+            # confirms it is active (state=2). Use Medium ramp for the first engagement frame.
+            canfd_ste_status = getattr(CS, "lat_ctl_ste_status", 1)
+            ramp_type = 3 if canfd_ste_status == 2 else 1
 
             path_offset_limit = float(np.interp(v_ego, *CarControllerParams.C0_MAX))
             path_offset = float(clip(path_offset, -path_offset_limit, path_offset_limit))
