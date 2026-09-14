@@ -8,7 +8,7 @@ from typing import Any
 
 from opendbc.car import structs
 from opendbc.car.interfaces import CarInterfaceBase
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import get_nn_model_path
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
@@ -115,6 +115,28 @@ def setup_interfaces(CI: CarInterfaceBase, params: Params | None = None) -> None
 def initialize_params(params) -> list[dict[str, Any]]:
   keys: list = []
 
+  # ford
+  keys.extend([
+    "FordPrefLateralControl",
+    "FordLowSpeedFactor_ang",
+    "FordHighSpeedFactor_ang",
+    "FordHighSpeedDampening_ang",
+    "FordLaneChangeFactor_ang",
+    "FordHumanTurnDetection_curv",
+    "FordLaneChangeFactor_curv",
+    "FordCustomProfile_curv",
+    "FordBlendRatioLow_curv",
+    "FordBlendRatioHigh_curv",
+    "FordLanePositioning_curv",
+    "FordLanePositioningGain_curv",
+    "FordLaneFullMode_curv",
+    "FordPathOffset_curv",
+    "FordFollowControl",
+    "FordDownhillCompensation",
+    "FordHandsFreeClusterMsg",
+    "FordDriverMonitorCanMsg",
+  ])
+
   # hyundai
   keys.extend([
     "HyundaiLongitudinalTuning",
@@ -138,4 +160,17 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "ToyotaStopAndGoHack",
   ])
 
-  return [{k: params.get(k, return_default=True)} for k in keys]
+  # A key the running params library does not know about raises UnknownKeyName, which would take
+  # the whole car process down on startup and leave the device stuck on "Waiting to start". That
+  # happens when common/params_keys.h is ahead of the compiled libparams_c.so, which is the normal
+  # state of affairs on a prebuilt branch, where nothing is rebuilt on device. Skip those keys
+  # loudly instead: the features they configure fall back to their defaults and the car still
+  # drives, rather than not starting at all.
+  values = []
+  for k in keys:
+    try:
+      values.append({k: params.get(k, return_default=True)})
+    except UnknownKeyName:
+      cloudlog.error(f"initialize_params: skipping '{k}', not in the compiled params list. "
+                     + "The build is out of date with the source; rebuild openpilot.")
+  return values

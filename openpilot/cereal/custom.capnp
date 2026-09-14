@@ -365,6 +365,9 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   enableGasInterceptor @5 :Bool;
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
+  fordLateralTuning @6 :FordLateralTuning;
+  fordLongitudinalTuning @7 :FordLongitudinalTuning;
+  fordHud @8 :FordHud;
 
   struct NeuralNetworkLateralControl {
     model @0 :Model;
@@ -375,6 +378,40 @@ struct CarParamsSP @0x80ae746ee2596b11 {
       name @1 :Text;
     }
   }
+
+  # BluePilot-derived Ford lateral control. Read once at car init from Params, so a change
+  # needs an onroad cycle -- the panda safety flag is set from the same read and the two
+  # layers must never disagree.
+  struct FordLateralTuning {
+    primaryControl @0 :UInt8;       # opendbc PrimaryLateralControl: 0 stock, 1 curvature, 2 angle
+
+    # angle mode
+    lowSpeedFactor @1 :Float32;     # [0.5, 1.5], default 1.0
+    highSpeedFactor @2 :Float32;    # [0.5, 1.5], default 1.0
+    highSpeedDampening @3 :Float32; # [0.25, 1.25], default 1.0
+    laneChangeFactor @4 :Float32;   # [0.85, 1.5], default 1.0
+
+    # curvature mode
+    humanTurnDetection @5 :Bool;
+    laneChangeFactorCurv @6 :Float32;   # [0.5, 1.0], default 0.85
+    blendRatioLow @7 :Float32;          # [0.0, 1.0], default 0.4
+    blendRatioHigh @8 :Float32;         # [0.0, 1.0], default 0.4
+    lanePositioning @9 :Bool;
+    pathOffset @10 :Float32;            # [-1.0, 1.0] m, default 0.0
+    laneFullMode @11 :Bool;
+    customProfile @12 :UInt8;           # 0 = platform defaults, 1 = the tuning values above
+    lanePositioningGain @13 :Float32;   # [0.0, 20.0], default 3.0
+  }
+
+  struct FordLongitudinalTuning {
+    followControl @0 :Bool;          # BluePilot lead-aware following (BP's disable_BP_long_UI inverted)
+    downhillCompensation @1 :Bool;   # allow negative pitch compensation
+  }
+
+  struct FordHud {
+    handsFreeClusterMsg @0 :Bool;    # BlueCruise hands-free cluster UI, CAN FD only
+    driverMonitorCanMsg @1 :Bool;    # drive the cluster's TJA warning from driver monitoring
+  }
 }
 
 struct CarControlSP @0xa5cd762cd951a455 {
@@ -383,6 +420,28 @@ struct CarControlSP @0xa5cd762cd951a455 {
   leadOne @2 :LeadData;
   leadTwo @3 :LeadData;
   intelligentCruiseButtonManagement @4 :IntelligentCruiseButtonManagement;
+  fordLateral @5 :FordLateral;
+
+  # Model/plan values Ford angle control needs. Lives here rather than being read from a
+  # SubMaster inside opendbc, which must not import openpilot.
+  struct FordLateral {
+    # modelV2 orientationRate.z / max(v_ego, 0.01), sampled at ModelConstants.T_IDXS
+    modelCurvatures @0 :List(Float32);
+    lateralDelay @1 :Float32;       # s, from lateralDelay.lateralDelay
+    laneChangeState @2 :UInt8;      # log.LaneChangeState: 0 off, 1 pre, 2 starting, 3 finishing
+    laneChangeDirection @3 :UInt8;  # log.LaneChangeDirection: 0 none, 1 left, 2 right
+
+    # curvature mode's lane centering. modelV2 position.y on the same T_IDXS grid, plus the
+    # inner lane lines and their probabilities.
+    modelPositionY @4 :List(Float32);
+    laneLineLeftY @5 :Float32;
+    laneLineRightY @6 :Float32;
+    laneLineLeftProb @7 :Float32;
+    laneLineRightProb @8 :Float32;
+
+    # selfdriveState.alertType, for the cluster's driver-monitoring messaging
+    alertType @9 :Text;
+  }
 
   struct Param {
     key @0 :Text;

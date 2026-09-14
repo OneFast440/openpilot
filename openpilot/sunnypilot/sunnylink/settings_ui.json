@@ -2168,6 +2168,369 @@
     }
   ],
   "vehicle_settings": {
+    "ford": {
+      "title": "Ford / Lincoln Settings",
+      "description": "",
+      "items": [
+        {
+          "key": "FordPrefLateralControl",
+          "widget": "multiple_button",
+          "title": "Primary Lateral Control",
+          "description": "Which signal steers the car. Stock drives curvature alone, as upstream openpilot does. Curvature drives all four of the signals the power steering module accepts, blending the model into the planner and anticipating curves. Angle steers with path_angle instead, which the module acts on immediately rather than filtering for up to a second.",
+          "options": [
+            {
+              "value": 0,
+              "label": "Stock"
+            },
+            {
+              "value": 1,
+              "label": "Curvature"
+            },
+            {
+              "value": 2,
+              "label": "Angle"
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLowSpeedFactor_ang",
+          "widget": "option",
+          "title": "Low Speed Factor (Angle)",
+          "description": "Scales the steering response below roughly 30 mph (50 km/h). Above 1.0 turns the wheel more, below 1.0 turns it less. Default 1.0.",
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordHighSpeedFactor_ang",
+          "widget": "option",
+          "title": "High Speed Factor (Angle)",
+          "description": "Scales the steering response above roughly 70 mph (115 km/h). Above 1.0 turns the wheel more, below 1.0 turns it less. Default 1.0.",
+          "min": 0.5,
+          "max": 1.5,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordHighSpeedDampening_ang",
+          "widget": "option",
+          "title": "High Speed Dampening (Angle)",
+          "description": "Scales the steering response on high-speed straightaways and gentle curves. Reduce it if the car oversteers on the highway, increase it if it understeers. Default 1.0.",
+          "min": 0.25,
+          "max": 1.25,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLaneChangeFactor_ang",
+          "widget": "option",
+          "title": "Lane Change Factor (Angle)",
+          "description": "Scales steering authority during a lane change. Most vehicles never need this; raise it if lane changes feel too soft. Default 1.0.",
+          "min": 0.85,
+          "max": 1.5,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordHumanTurnDetection_curv",
+          "widget": "toggle",
+          "title": "Hand Back On Manual Turns (Curvature)",
+          "description": "Hand steering back to you while you hold a real turn, instead of winding up a command the power steering module has to reconcile when you let go. Control resumes on its own.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLaneChangeFactor_curv",
+          "widget": "option",
+          "title": "Lane Change Factor (Curvature)",
+          "description": "Scales steering authority during a lane change. Lower is gentler. Default 0.85.",
+          "min": 0.5,
+          "max": 1.0,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLanePositioning_curv",
+          "widget": "toggle",
+          "title": "Lane Centering Trim (Curvature)",
+          "description": "Trim the car toward the center of the lane with a separate heading correction, rather than relying on curvature alone. Off by default.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLaneFullMode_curv",
+          "widget": "toggle",
+          "title": "Use Detected Lane Lines (Curvature)",
+          "description": "Blend the detected lane lines into the lane position rather than following the model path alone. Helps where the lane is well marked and the model path is not centered.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordPathOffset_curv",
+          "widget": "option",
+          "title": "In-Lane Position (Curvature)",
+          "description": "Shift the car within its lane. Negative moves left, positive moves right. Default 0.0.",
+          "min": -1.0,
+          "max": 1.0,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordCustomProfile_curv",
+          "widget": "toggle",
+          "title": "Custom Tuning Profile (Curvature)",
+          "description": "Tune how much of the model prediction is blended into the planner, and how hard the car works to hold lane position. Leave this off to use the values tested for your vehicle.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordBlendRatioLow_curv",
+          "widget": "option",
+          "title": "Model Blend, Straights (Curvature)",
+          "description": "How much of the model prediction is used on straights and gentle curves. 0.0 is planner only, 1.0 is model only. Default 0.4.",
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            },
+            {
+              "type": "param",
+              "key": "FordCustomProfile_curv",
+              "equals": true
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordBlendRatioHigh_curv",
+          "widget": "option",
+          "title": "Model Blend, Curves (Curvature)",
+          "description": "How much of the model prediction is used in sharper curves. 0.0 is planner only, 1.0 is model only. Default 0.4.",
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            },
+            {
+              "type": "param",
+              "key": "FordCustomProfile_curv",
+              "equals": true
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordLanePositioningGain_curv",
+          "widget": "option",
+          "title": "Lane Centering Strength (Curvature)",
+          "description": "How hard the centering correction works. Raise it if the car sits off center, lower it if it wanders. Default 3.0.",
+          "min": 0.0,
+          "max": 20.0,
+          "step": 0.5,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            },
+            {
+              "type": "param",
+              "key": "FordCustomProfile_curv",
+              "equals": true
+            },
+            {
+              "type": "param",
+              "key": "FordLanePositioning_curv",
+              "equals": true
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordFollowControl",
+          "widget": "toggle",
+          "title": "Lead-Aware Following",
+          "description": "Adjust gas and braking based on what the lead vehicle is doing: cut gas when closing on it, cap gas when matched to it, and ease the first brake application in. Highway speeds only, and only behind a lead that is also moving at highway speed.",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordDownhillCompensation",
+          "widget": "toggle",
+          "title": "Downhill Brake Compensation",
+          "description": "Let a downhill grade count toward the braking decision. Turn this off if the car pre-charges the brakes every time the road tips forward.",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordHandsFreeClusterMsg",
+          "widget": "toggle",
+          "title": "Hands-Free Cluster Display",
+          "description": "Use the cluster's BlueCruise hands-free presentation while lateral control is active. CAN FD vehicles only.",
+          "visibility": [
+            {
+              "type": "capability",
+              "field": "brand",
+              "equals": "ford"
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
+          "key": "FordDriverMonitorCanMsg",
+          "widget": "toggle",
+          "title": "Driver Monitoring In Cluster",
+          "description": "Drive the cluster's own hands-on-wheel prompt and warnings from driver monitoring, so the escalation appears in the instrument cluster as well as on the device.",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        }
+      ]
+    },
     "hyundai": {
       "title": "Hyundai / Kia / Genesis Settings",
       "description": "",
