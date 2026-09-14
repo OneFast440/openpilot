@@ -7,29 +7,41 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.vehicle.brands.base import BrandSettings
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr, tr_noop
-from openpilot.system.ui.sunnypilot.widgets.list_view import multiple_button_item_sp, option_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import (
+  LineSeparatorSP,
+  multiple_button_item_sp,
+  option_item_sp,
+  toggle_item_sp,
+)
 
+from opendbc.car.ford.values import FordFlags
 from opendbc.sunnypilot.car.ford.values_ext import (
+  BLEND_RATIO_RANGE,
   HIGH_SPEED_DAMPENING_RANGE,
   HIGH_SPEED_FACTOR_RANGE,
+  LANE_CHANGE_FACTOR_CURV_RANGE,
   LANE_CHANGE_FACTOR_RANGE,
+  LANE_POSITIONING_GAIN_RANGE,
   LOW_SPEED_FACTOR_RANGE,
+  PATH_OFFSET_RANGE,
   PrimaryLateralControl,
 )
 
-# OptionControlSP stores float params scaled by 100, so the widget bounds are the physical
-# range x100 and a step of 5 moves in 0.05 increments.
+# OptionControlSP stores float params scaled by 100, so the widget bounds are the physical range
+# x100 and a step of 5 moves in 0.05 increments.
 _SCALE = 100
 _STEP = 5
 
-OFFROAD_ONLY_DESCRIPTION = tr_noop("This feature is unavailable while the car is onroad.")
+OFFROAD_ONLY = tr_noop("This feature is unavailable while the car is onroad.")
 
 DESCRIPTIONS = {
   'primary_control': tr_noop(
-    'Which signal steers the car. Curvature is the stock strategy. Angle steers with path_angle instead, which the ' +
-    'power steering module acts on immediately rather than filtering for up to a second, and generally holds a lane ' +
-    'and exits curves more cleanly. Switch back to Curvature if your vehicle does not respond well.'
+    'Which signal steers the car. Stock drives curvature alone, as upstream openpilot does. ' +
+    'Curvature drives all four of the signals the power steering module accepts, blending the model into the ' +
+    'planner and anticipating curves. Angle steers with path_angle instead, which the module acts on immediately ' +
+    'rather than filtering for up to a second.'
   ),
+  # angle
   'low_speed_factor': tr_noop(
     'Scales the steering response below roughly 30 mph (50 km/h). Above 1.0 turns the wheel more, below 1.0 turns it less.'
   ),
@@ -40,8 +52,57 @@ DESCRIPTIONS = {
     'Scales the steering response on high-speed straightaways and gentle curves. Reduce it if the car oversteers on ' +
     'the highway, increase it if it understeers.'
   ),
-  'lane_change_factor': tr_noop(
+  'lane_change_factor_ang': tr_noop(
     'Scales steering authority during a lane change. Most vehicles never need this; raise it if lane changes feel too soft.'
+  ),
+  # curvature
+  'human_turn': tr_noop(
+    'Hand steering back to you while you hold a real turn, instead of winding up a command the power steering ' +
+    'module has to reconcile when you let go. Control resumes on its own.'
+  ),
+  'lane_change_factor_curv': tr_noop(
+    'Scales steering authority during a lane change. Lower is gentler.'
+  ),
+  'custom_profile': tr_noop(
+    'Tune how much of the model prediction is blended into the planner, and how hard the car works to hold lane ' +
+    'position. Leave this off to use the values tested for your vehicle.'
+  ),
+  'blend_ratio_low': tr_noop(
+    'How much of the model prediction is used on straights and gentle curves. 0.0 is planner only, 1.0 is model only.'
+  ),
+  'blend_ratio_high': tr_noop(
+    'How much of the model prediction is used in sharper curves. 0.0 is planner only, 1.0 is model only.'
+  ),
+  'lane_positioning': tr_noop(
+    'Trim the car toward the center of the lane with a separate heading correction, rather than relying on ' +
+    'curvature alone. Off by default.'
+  ),
+  'lane_positioning_gain': tr_noop(
+    'How hard the centering correction works. Raise it if the car sits off center, lower it if it wanders.'
+  ),
+  'lane_full_mode': tr_noop(
+    'Blend the detected lane lines into the lane position rather than following the model path alone. Helps where ' +
+    'the lane is well marked and the model path is not centered.'
+  ),
+  'path_offset': tr_noop(
+    'Shift the car within its lane. Negative moves left, positive moves right.'
+  ),
+  # longitudinal and cluster
+  'follow_control': tr_noop(
+    'Adjust gas and braking based on what the lead vehicle is doing: cut gas when closing on it, cap gas when ' +
+    'matched to it, and ease the first brake application in. Highway speeds only, and only behind a lead that is ' +
+    'also moving at highway speed.'
+  ),
+  'downhill_compensation': tr_noop(
+    'Let a downhill grade count toward the braking decision. Turn this off if the car pre-charges the brakes every ' +
+    'time the road tips forward.'
+  ),
+  'hands_free_cluster': tr_noop(
+    'Use the cluster\'s BlueCruise hands-free presentation while lateral control is active. CAN FD vehicles only.'
+  ),
+  'driver_monitor_cluster': tr_noop(
+    'Drive the cluster\'s own hands-on-wheel prompt and warnings from driver monitoring, so the escalation appears ' +
+    'in the instrument cluster as well as on the device.'
   ),
 }
 
@@ -59,72 +120,148 @@ class FordSettings(BrandSettings):
     self.primary_control = multiple_button_item_sp(
       lambda: tr("Primary Lateral Control"),
       lambda: tr(DESCRIPTIONS["primary_control"]),
-      [tr("Curvature"), tr("Angle")],
-      button_width=300,
+      [tr("Stock"), tr("Curvature"), tr("Angle")],
+      button_width=255,
       callback=self._on_primary_control_selected,
       param="FordPrefLateralControl",
       inline=False,
     )
 
-    self.low_speed_factor = self._factor_item(
-      tr_noop("Low Speed Factor"), "FordLowSpeedFactor_ang", DESCRIPTIONS["low_speed_factor"], LOW_SPEED_FACTOR_RANGE)
-    self.high_speed_factor = self._factor_item(
-      tr_noop("High Speed Factor"), "FordHighSpeedFactor_ang", DESCRIPTIONS["high_speed_factor"], HIGH_SPEED_FACTOR_RANGE)
-    self.high_speed_dampening = self._factor_item(
-      tr_noop("High Speed Dampening"), "FordHighSpeedDampening_ang", DESCRIPTIONS["high_speed_dampening"],
-      HIGH_SPEED_DAMPENING_RANGE)
-    self.lane_change_factor = self._factor_item(
-      tr_noop("Lane Change Factor"), "FordLaneChangeFactor_ang", DESCRIPTIONS["lane_change_factor"],
-      LANE_CHANGE_FACTOR_RANGE)
+    # angle mode
+    self.low_speed_factor = self._slider(
+      tr_noop("Low Speed Factor"), "FordLowSpeedFactor_ang", "low_speed_factor", LOW_SPEED_FACTOR_RANGE)
+    self.high_speed_factor = self._slider(
+      tr_noop("High Speed Factor"), "FordHighSpeedFactor_ang", "high_speed_factor", HIGH_SPEED_FACTOR_RANGE)
+    self.high_speed_dampening = self._slider(
+      tr_noop("High Speed Dampening"), "FordHighSpeedDampening_ang", "high_speed_dampening", HIGH_SPEED_DAMPENING_RANGE)
+    self.lane_change_factor_ang = self._slider(
+      tr_noop("Lane Change Factor"), "FordLaneChangeFactor_ang", "lane_change_factor_ang", LANE_CHANGE_FACTOR_RANGE)
+
+    # curvature mode
+    self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
+    self.lane_change_factor_curv = self._slider(
+      tr_noop("Lane Change Factor"), "FordLaneChangeFactor_curv", "lane_change_factor_curv", LANE_CHANGE_FACTOR_CURV_RANGE)
+    self.custom_profile = self._toggle(tr_noop("Custom Tuning Profile"), "FordCustomProfile_curv", "custom_profile")
+    self.blend_ratio_low = self._slider(
+      tr_noop("Model Blend, Straights"), "FordBlendRatioLow_curv", "blend_ratio_low", BLEND_RATIO_RANGE)
+    self.blend_ratio_high = self._slider(
+      tr_noop("Model Blend, Curves"), "FordBlendRatioHigh_curv", "blend_ratio_high", BLEND_RATIO_RANGE)
+    self.lane_positioning = self._toggle(tr_noop("Lane Centering Trim"), "FordLanePositioning_curv", "lane_positioning")
+    self.lane_positioning_gain = self._slider(
+      tr_noop("Lane Centering Strength"), "FordLanePositioningGain_curv", "lane_positioning_gain",
+      LANE_POSITIONING_GAIN_RANGE)
+    self.lane_full_mode = self._toggle(tr_noop("Use Detected Lane Lines"), "FordLaneFullMode_curv", "lane_full_mode")
+    self.path_offset = self._slider(
+      tr_noop("In-Lane Position"), "FordPathOffset_curv", "path_offset", PATH_OFFSET_RANGE)
+
+    # longitudinal and cluster
+    self.follow_control = self._toggle(tr_noop("Lead-Aware Following"), "FordFollowControl", "follow_control")
+    self.downhill_compensation = self._toggle(
+      tr_noop("Downhill Brake Compensation"), "FordDownhillCompensation", "downhill_compensation")
+    self.hands_free_cluster = self._toggle(
+      tr_noop("Hands-Free Cluster Display"), "FordHandsFreeClusterMsg", "hands_free_cluster")
+    self.driver_monitor_cluster = self._toggle(
+      tr_noop("Driver Monitoring In Cluster"), "FordDriverMonitorCanMsg", "driver_monitor_cluster")
 
     self.angle_items = [
       self.low_speed_factor,
       self.high_speed_factor,
       self.high_speed_dampening,
-      self.lane_change_factor,
+      self.lane_change_factor_ang,
     ]
-    self.items = [self.primary_control, *self.angle_items]
+    self.curvature_items = [
+      self.human_turn,
+      self.lane_change_factor_curv,
+      self.lane_positioning,
+      self.lane_positioning_gain,
+      self.lane_full_mode,
+      self.path_offset,
+      self.custom_profile,
+      self.blend_ratio_low,
+      self.blend_ratio_high,
+    ]
+
+    self.items = [
+      self.primary_control,
+      *self.angle_items,
+      *self.curvature_items,
+      LineSeparatorSP(),
+      self.follow_control,
+      self.downhill_compensation,
+      self.hands_free_cluster,
+      self.driver_monitor_cluster,
+    ]
 
   @staticmethod
-  def _factor_item(title: str, param: str, description: str, value_range: tuple[float, float, float]):
+  def _slider(title: str, param: str, description_key: str, value_range: tuple[float, float, float]):
     _, min_value, max_value = value_range
     return option_item_sp(
       lambda: tr(title),
       param,
       round(min_value * _SCALE),
       round(max_value * _SCALE),
-      description=lambda: tr(description),
+      description=lambda: tr(DESCRIPTIONS[description_key]),
       value_change_step=_STEP,
       use_float_scaling=True,
       enabled=lambda: ui_state.is_offroad(),
     )
 
   @staticmethod
+  def _toggle(title: str, param: str, description_key: str):
+    return toggle_item_sp(
+      lambda: tr(title),
+      description=lambda: tr(DESCRIPTIONS[description_key]),
+      initial_state=ui_state.params.get_bool(param),
+      callback=lambda state, key=param: ui_state.params.put_bool(key, state),
+      enabled=lambda: ui_state.is_offroad(),
+    )
+
+  @staticmethod
   def _on_primary_control_selected(index: int):
-    # Read once at car init, together with the panda safety flag, so the change takes a restart.
+    # Read once at car init, together with the panda's lateral mode, so the change takes a restart.
     ui_state.params.put("FordPrefLateralControl", index)
 
   def update_settings(self):
     offroad = ui_state.is_offroad()
-    primary = int(ui_state.params.get("FordPrefLateralControl") or 0)
-    angle_mode = primary == PrimaryLateralControl.angle
+    mode = int(ui_state.params.get("FordPrefLateralControl") or 0)
+    is_angle = mode == PrimaryLateralControl.angle
+    is_curvature = mode == PrimaryLateralControl.curvature
+    is_canfd = bool(ui_state.CP is not None and ui_state.CP.brand == "ford"
+                    and ui_state.CP.flags & FordFlags.CANFD)
 
     self.primary_control.action_item.set_enabled(offroad)
-    self.primary_control.action_item.set_selected_button(primary)
+    self.primary_control.action_item.set_selected_button(mode)
 
     description = tr(DESCRIPTIONS["primary_control"])
     if not offroad:
-      description = "<b>" + tr(OFFROAD_ONLY_DESCRIPTION) + "</b>\n\n" + description
+      description = "<b>" + tr(OFFROAD_ONLY) + "</b>\n\n" + description
     if self.primary_control.description != description:
       self.primary_control.set_description(description)
       self.primary_control.show_description(True)
 
     for index, item in enumerate(self.angle_items):
-      item.set_visible(angle_mode)
+      item.set_visible(is_angle)
       item.action_item.set_enabled(offroad)
       # the tuning note belongs on the first factor only, where it reads as an intro to the group
-      if index == 0 and angle_mode:
+      if index == 0 and is_angle:
         note = tr(ANGLE_TUNING_NOTE) + "\n\n" + tr(DESCRIPTIONS["low_speed_factor"])
         if item.description != note:
           item.set_description(note)
           item.show_description(True)
+
+    custom_profile_on = ui_state.params.get_bool("FordCustomProfile_curv")
+    lane_positioning_on = ui_state.params.get_bool("FordLanePositioning_curv")
+    for item in self.curvature_items:
+      visible = is_curvature
+      if item in (self.blend_ratio_low, self.blend_ratio_high):
+        visible = visible and custom_profile_on
+      elif item is self.lane_positioning_gain:
+        visible = visible and lane_positioning_on and custom_profile_on
+      item.set_visible(visible)
+      item.action_item.set_enabled(offroad)
+
+    for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster):
+      item.action_item.set_enabled(offroad)
+    # the cluster's hands-free presentation only exists on CAN FD vehicles
+    self.hands_free_cluster.set_visible(is_canfd)
+    self.hands_free_cluster.action_item.set_enabled(offroad)

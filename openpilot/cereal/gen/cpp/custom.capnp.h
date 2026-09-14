@@ -214,6 +214,8 @@ CAPNP_DECLARE_SCHEMA(80ae746ee2596b11);
 CAPNP_DECLARE_SCHEMA(dafc8108312924ef);
 CAPNP_DECLARE_SCHEMA(817ed0dfcd0ed40f);
 CAPNP_DECLARE_SCHEMA(9a4a48d3e3a2a53b);
+CAPNP_DECLARE_SCHEMA(c06f4bd14111588b);
+CAPNP_DECLARE_SCHEMA(b1ebb142dadff180);
 CAPNP_DECLARE_SCHEMA(a5cd762cd951a455);
 CAPNP_DECLARE_SCHEMA(d5560a2b0e0fe144);
 CAPNP_DECLARE_SCHEMA(e20e376316fa68c4);
@@ -663,9 +665,11 @@ struct CarParamsSP {
   class Pipeline;
   struct NeuralNetworkLateralControl;
   struct FordLateralTuning;
+  struct FordLongitudinalTuning;
+  struct FordHud;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(80ae746ee2596b11, 1, 2)
+    CAPNP_DECLARE_STRUCT_HEADER(80ae746ee2596b11, 1, 4)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -711,7 +715,37 @@ struct CarParamsSP::FordLateralTuning {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(9a4a48d3e3a2a53b, 3, 0)
+    CAPNP_DECLARE_STRUCT_HEADER(9a4a48d3e3a2a53b, 5, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct CarParamsSP::FordLongitudinalTuning {
+  FordLongitudinalTuning() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(c06f4bd14111588b, 1, 0)
+    #if !CAPNP_LITE
+    static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
+    #endif  // !CAPNP_LITE
+  };
+};
+
+struct CarParamsSP::FordHud {
+  FordHud() = delete;
+
+  class Reader;
+  class Builder;
+  class Pipeline;
+
+  struct _capnpPrivate {
+    CAPNP_DECLARE_STRUCT_HEADER(b1ebb142dadff180, 1, 0)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -745,7 +779,7 @@ struct CarControlSP::FordLateral {
   class Pipeline;
 
   struct _capnpPrivate {
-    CAPNP_DECLARE_STRUCT_HEADER(d5560a2b0e0fe144, 1, 1)
+    CAPNP_DECLARE_STRUCT_HEADER(d5560a2b0e0fe144, 3, 3)
     #if !CAPNP_LITE
     static constexpr ::capnp::_::RawBrandedSchema const* brand() { return &schema->defaultBrand; }
     #endif  // !CAPNP_LITE
@@ -3443,6 +3477,12 @@ public:
   inline bool hasFordLateralTuning() const;
   inline  ::cereal::CarParamsSP::FordLateralTuning::Reader getFordLateralTuning() const;
 
+  inline bool hasFordLongitudinalTuning() const;
+  inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Reader getFordLongitudinalTuning() const;
+
+  inline bool hasFordHud() const;
+  inline  ::cereal::CarParamsSP::FordHud::Reader getFordHud() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -3500,6 +3540,20 @@ public:
   inline void adoptFordLateralTuning(::capnp::Orphan< ::cereal::CarParamsSP::FordLateralTuning>&& value);
   inline ::capnp::Orphan< ::cereal::CarParamsSP::FordLateralTuning> disownFordLateralTuning();
 
+  inline bool hasFordLongitudinalTuning();
+  inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Builder getFordLongitudinalTuning();
+  inline void setFordLongitudinalTuning( ::cereal::CarParamsSP::FordLongitudinalTuning::Reader value);
+  inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Builder initFordLongitudinalTuning();
+  inline void adoptFordLongitudinalTuning(::capnp::Orphan< ::cereal::CarParamsSP::FordLongitudinalTuning>&& value);
+  inline ::capnp::Orphan< ::cereal::CarParamsSP::FordLongitudinalTuning> disownFordLongitudinalTuning();
+
+  inline bool hasFordHud();
+  inline  ::cereal::CarParamsSP::FordHud::Builder getFordHud();
+  inline void setFordHud( ::cereal::CarParamsSP::FordHud::Reader value);
+  inline  ::cereal::CarParamsSP::FordHud::Builder initFordHud();
+  inline void adoptFordHud(::capnp::Orphan< ::cereal::CarParamsSP::FordHud>&& value);
+  inline ::capnp::Orphan< ::cereal::CarParamsSP::FordHud> disownFordHud();
+
 private:
   ::capnp::_::StructBuilder _builder;
   template <typename, ::capnp::Kind>
@@ -3520,6 +3574,8 @@ public:
 
   inline  ::cereal::CarParamsSP::NeuralNetworkLateralControl::Pipeline getNeuralNetworkLateralControl();
   inline  ::cereal::CarParamsSP::FordLateralTuning::Pipeline getFordLateralTuning();
+  inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Pipeline getFordLongitudinalTuning();
+  inline  ::cereal::CarParamsSP::FordHud::Pipeline getFordHud();
 private:
   ::capnp::AnyPointer::Pipeline _typeless;
   friend class ::capnp::PipelineHook;
@@ -3733,6 +3789,24 @@ public:
 
   inline float getLaneChangeFactor() const;
 
+  inline bool getHumanTurnDetection() const;
+
+  inline float getLaneChangeFactorCurv() const;
+
+  inline float getBlendRatioLow() const;
+
+  inline float getBlendRatioHigh() const;
+
+  inline bool getLanePositioning() const;
+
+  inline float getPathOffset() const;
+
+  inline bool getLaneFullMode() const;
+
+  inline  ::uint8_t getCustomProfile() const;
+
+  inline float getLanePositioningGain() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -3776,6 +3850,33 @@ public:
   inline float getLaneChangeFactor();
   inline void setLaneChangeFactor(float value);
 
+  inline bool getHumanTurnDetection();
+  inline void setHumanTurnDetection(bool value);
+
+  inline float getLaneChangeFactorCurv();
+  inline void setLaneChangeFactorCurv(float value);
+
+  inline float getBlendRatioLow();
+  inline void setBlendRatioLow(float value);
+
+  inline float getBlendRatioHigh();
+  inline void setBlendRatioHigh(float value);
+
+  inline bool getLanePositioning();
+  inline void setLanePositioning(bool value);
+
+  inline float getPathOffset();
+  inline void setPathOffset(float value);
+
+  inline bool getLaneFullMode();
+  inline void setLaneFullMode(bool value);
+
+  inline  ::uint8_t getCustomProfile();
+  inline void setCustomProfile( ::uint8_t value);
+
+  inline float getLanePositioningGain();
+  inline void setLanePositioningGain(float value);
+
 private:
   ::capnp::_::StructBuilder _builder;
   template <typename, ::capnp::Kind>
@@ -3789,6 +3890,168 @@ private:
 class CarParamsSP::FordLateralTuning::Pipeline {
 public:
   typedef FordLateralTuning Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class CarParamsSP::FordLongitudinalTuning::Reader {
+public:
+  typedef FordLongitudinalTuning Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool getFollowControl() const;
+
+  inline bool getDownhillCompensation() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class CarParamsSP::FordLongitudinalTuning::Builder {
+public:
+  typedef FordLongitudinalTuning Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool getFollowControl();
+  inline void setFollowControl(bool value);
+
+  inline bool getDownhillCompensation();
+  inline void setDownhillCompensation(bool value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class CarParamsSP::FordLongitudinalTuning::Pipeline {
+public:
+  typedef FordLongitudinalTuning Pipelines;
+
+  inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
+  inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
+      : _typeless(kj::mv(typeless)) {}
+
+private:
+  ::capnp::AnyPointer::Pipeline _typeless;
+  friend class ::capnp::PipelineHook;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+};
+#endif  // !CAPNP_LITE
+
+class CarParamsSP::FordHud::Reader {
+public:
+  typedef FordHud Reads;
+
+  Reader() = default;
+  inline explicit Reader(::capnp::_::StructReader base): _reader(base) {}
+
+  inline ::capnp::MessageSize totalSize() const {
+    return _reader.totalSize().asPublic();
+  }
+
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const {
+    return ::capnp::_::structString(_reader, *_capnpPrivate::brand());
+  }
+#endif  // !CAPNP_LITE
+
+  inline bool getHandsFreeClusterMsg() const;
+
+  inline bool getDriverMonitorCanMsg() const;
+
+private:
+  ::capnp::_::StructReader _reader;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::List;
+  friend class ::capnp::MessageBuilder;
+  friend class ::capnp::Orphanage;
+};
+
+class CarParamsSP::FordHud::Builder {
+public:
+  typedef FordHud Builds;
+
+  Builder() = delete;  // Deleted to discourage incorrect usage.
+                       // You can explicitly initialize to nullptr instead.
+  inline Builder(decltype(nullptr)) {}
+  inline explicit Builder(::capnp::_::StructBuilder base): _builder(base) {}
+  inline operator Reader() const { return Reader(_builder.asReader()); }
+  inline Reader asReader() const { return *this; }
+
+  inline ::capnp::MessageSize totalSize() const { return asReader().totalSize(); }
+#if !CAPNP_LITE
+  inline ::kj::StringTree toString() const { return asReader().toString(); }
+#endif  // !CAPNP_LITE
+
+  inline bool getHandsFreeClusterMsg();
+  inline void setHandsFreeClusterMsg(bool value);
+
+  inline bool getDriverMonitorCanMsg();
+  inline void setDriverMonitorCanMsg(bool value);
+
+private:
+  ::capnp::_::StructBuilder _builder;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::ToDynamic_;
+  friend class ::capnp::Orphanage;
+  template <typename, ::capnp::Kind>
+  friend struct ::capnp::_::PointerHelpers;
+};
+
+#if !CAPNP_LITE
+class CarParamsSP::FordHud::Pipeline {
+public:
+  typedef FordHud Pipelines;
 
   inline Pipeline(decltype(nullptr)): _typeless(nullptr) {}
   inline explicit Pipeline(::capnp::AnyPointer::Pipeline&& typeless)
@@ -3964,6 +4227,20 @@ public:
 
   inline  ::uint8_t getLaneChangeDirection() const;
 
+  inline bool hasModelPositionY() const;
+  inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Reader getModelPositionY() const;
+
+  inline float getLaneLineLeftY() const;
+
+  inline float getLaneLineRightY() const;
+
+  inline float getLaneLineLeftProb() const;
+
+  inline float getLaneLineRightProb() const;
+
+  inline bool hasAlertType() const;
+  inline  ::capnp::Text::Reader getAlertType() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -4008,6 +4285,33 @@ public:
 
   inline  ::uint8_t getLaneChangeDirection();
   inline void setLaneChangeDirection( ::uint8_t value);
+
+  inline bool hasModelPositionY();
+  inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Builder getModelPositionY();
+  inline void setModelPositionY( ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Reader value);
+  inline void setModelPositionY(::kj::ArrayPtr<const float> value);
+  inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Builder initModelPositionY(unsigned int size);
+  inline void adoptModelPositionY(::capnp::Orphan< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>&& value);
+  inline ::capnp::Orphan< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>> disownModelPositionY();
+
+  inline float getLaneLineLeftY();
+  inline void setLaneLineLeftY(float value);
+
+  inline float getLaneLineRightY();
+  inline void setLaneLineRightY(float value);
+
+  inline float getLaneLineLeftProb();
+  inline void setLaneLineLeftProb(float value);
+
+  inline float getLaneLineRightProb();
+  inline void setLaneLineRightProb(float value);
+
+  inline bool hasAlertType();
+  inline  ::capnp::Text::Builder getAlertType();
+  inline void setAlertType( ::capnp::Text::Reader value);
+  inline  ::capnp::Text::Builder initAlertType(unsigned int size);
+  inline void adoptAlertType(::capnp::Orphan< ::capnp::Text>&& value);
+  inline ::capnp::Orphan< ::capnp::Text> disownAlertType();
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -8058,6 +8362,84 @@ inline ::capnp::Orphan< ::cereal::CarParamsSP::FordLateralTuning> CarParamsSP::B
       ::capnp::bounded<1>() * ::capnp::POINTERS));
 }
 
+inline bool CarParamsSP::Reader::hasFordLongitudinalTuning() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline bool CarParamsSP::Builder::hasFordLongitudinalTuning() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Reader CarParamsSP::Reader::getFordLongitudinalTuning() const {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::get(_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Builder CarParamsSP::Builder::getFordLongitudinalTuning() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::get(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Pipeline CarParamsSP::Pipeline::getFordLongitudinalTuning() {
+  return  ::cereal::CarParamsSP::FordLongitudinalTuning::Pipeline(_typeless.getPointerField(2));
+}
+#endif  // !CAPNP_LITE
+inline void CarParamsSP::Builder::setFordLongitudinalTuning( ::cereal::CarParamsSP::FordLongitudinalTuning::Reader value) {
+  ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::set(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), value);
+}
+inline  ::cereal::CarParamsSP::FordLongitudinalTuning::Builder CarParamsSP::Builder::initFordLongitudinalTuning() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::init(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline void CarParamsSP::Builder::adoptFordLongitudinalTuning(
+    ::capnp::Orphan< ::cereal::CarParamsSP::FordLongitudinalTuning>&& value) {
+  ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::adopt(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::cereal::CarParamsSP::FordLongitudinalTuning> CarParamsSP::Builder::disownFordLongitudinalTuning() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordLongitudinalTuning>::disown(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+
+inline bool CarParamsSP::Reader::hasFordHud() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS).isNull();
+}
+inline bool CarParamsSP::Builder::hasFordHud() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS).isNull();
+}
+inline  ::cereal::CarParamsSP::FordHud::Reader CarParamsSP::Reader::getFordHud() const {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::get(_reader.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS));
+}
+inline  ::cereal::CarParamsSP::FordHud::Builder CarParamsSP::Builder::getFordHud() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::get(_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS));
+}
+#if !CAPNP_LITE
+inline  ::cereal::CarParamsSP::FordHud::Pipeline CarParamsSP::Pipeline::getFordHud() {
+  return  ::cereal::CarParamsSP::FordHud::Pipeline(_typeless.getPointerField(3));
+}
+#endif  // !CAPNP_LITE
+inline void CarParamsSP::Builder::setFordHud( ::cereal::CarParamsSP::FordHud::Reader value) {
+  ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::set(_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS), value);
+}
+inline  ::cereal::CarParamsSP::FordHud::Builder CarParamsSP::Builder::initFordHud() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::init(_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS));
+}
+inline void CarParamsSP::Builder::adoptFordHud(
+    ::capnp::Orphan< ::cereal::CarParamsSP::FordHud>&& value) {
+  ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::adopt(_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::cereal::CarParamsSP::FordHud> CarParamsSP::Builder::disownFordHud() {
+  return ::capnp::_::PointerHelpers< ::cereal::CarParamsSP::FordHud>::disown(_builder.getPointerField(
+      ::capnp::bounded<3>() * ::capnp::POINTERS));
+}
+
 inline bool CarParamsSP::NeuralNetworkLateralControl::Reader::hasModel() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -8247,6 +8629,188 @@ inline float CarParamsSP::FordLateralTuning::Builder::getLaneChangeFactor() {
 inline void CarParamsSP::FordLateralTuning::Builder::setLaneChangeFactor(float value) {
   _builder.setDataField<float>(
       ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Reader::getHumanTurnDetection() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Builder::getHumanTurnDetection() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setHumanTurnDetection(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarParamsSP::FordLateralTuning::Reader::getLaneChangeFactorCurv() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+
+inline float CarParamsSP::FordLateralTuning::Builder::getLaneChangeFactorCurv() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setLaneChangeFactorCurv(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarParamsSP::FordLateralTuning::Reader::getBlendRatioLow() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
+}
+
+inline float CarParamsSP::FordLateralTuning::Builder::getBlendRatioLow() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setBlendRatioLow(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<6>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarParamsSP::FordLateralTuning::Reader::getBlendRatioHigh() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+}
+
+inline float CarParamsSP::FordLateralTuning::Builder::getBlendRatioHigh() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setBlendRatioHigh(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<7>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Reader::getLanePositioning() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Builder::getLanePositioning() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setLanePositioning(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarParamsSP::FordLateralTuning::Reader::getPathOffset() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+
+inline float CarParamsSP::FordLateralTuning::Builder::getPathOffset() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setPathOffset(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<8>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Reader::getLaneFullMode() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordLateralTuning::Builder::getLaneFullMode() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setLaneFullMode(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<10>() * ::capnp::ELEMENTS, value);
+}
+
+inline  ::uint8_t CarParamsSP::FordLateralTuning::Reader::getCustomProfile() const {
+  return _reader.getDataField< ::uint8_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline  ::uint8_t CarParamsSP::FordLateralTuning::Builder::getCustomProfile() {
+  return _builder.getDataField< ::uint8_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setCustomProfile( ::uint8_t value) {
+  _builder.setDataField< ::uint8_t>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarParamsSP::FordLateralTuning::Reader::getLanePositioningGain() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+
+inline float CarParamsSP::FordLateralTuning::Builder::getLanePositioningGain() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLateralTuning::Builder::setLanePositioningGain(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<9>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordLongitudinalTuning::Reader::getFollowControl() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordLongitudinalTuning::Builder::getFollowControl() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLongitudinalTuning::Builder::setFollowControl(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordLongitudinalTuning::Reader::getDownhillCompensation() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordLongitudinalTuning::Builder::getDownhillCompensation() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordLongitudinalTuning::Builder::setDownhillCompensation(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordHud::Reader::getHandsFreeClusterMsg() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordHud::Builder::getHandsFreeClusterMsg() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordHud::Builder::setHandsFreeClusterMsg(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<0>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarParamsSP::FordHud::Reader::getDriverMonitorCanMsg() const {
+  return _reader.getDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline bool CarParamsSP::FordHud::Builder::getDriverMonitorCanMsg() {
+  return _builder.getDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void CarParamsSP::FordHud::Builder::setDriverMonitorCanMsg(bool value) {
+  _builder.setDataField<bool>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
 }
 
 inline bool CarControlSP::Reader::hasMads() const {
@@ -8556,6 +9120,134 @@ inline  ::uint8_t CarControlSP::FordLateral::Builder::getLaneChangeDirection() {
 inline void CarControlSP::FordLateral::Builder::setLaneChangeDirection( ::uint8_t value) {
   _builder.setDataField< ::uint8_t>(
       ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarControlSP::FordLateral::Reader::hasModelPositionY() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline bool CarControlSP::FordLateral::Builder::hasModelPositionY() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Reader CarControlSP::FordLateral::Reader::getModelPositionY() const {
+  return ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::get(_reader.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Builder CarControlSP::FordLateral::Builder::getModelPositionY() {
+  return ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::get(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+inline void CarControlSP::FordLateral::Builder::setModelPositionY( ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline void CarControlSP::FordLateral::Builder::setModelPositionY(::kj::ArrayPtr<const float> value) {
+  ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::set(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>::Builder CarControlSP::FordLateral::Builder::initModelPositionY(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::init(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), size);
+}
+inline void CarControlSP::FordLateral::Builder::adoptModelPositionY(
+    ::capnp::Orphan< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::adopt(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>> CarControlSP::FordLateral::Builder::disownModelPositionY() {
+  return ::capnp::_::PointerHelpers< ::capnp::List<float,  ::capnp::Kind::PRIMITIVE>>::disown(_builder.getPointerField(
+      ::capnp::bounded<1>() * ::capnp::POINTERS));
+}
+
+inline float CarControlSP::FordLateral::Reader::getLaneLineLeftY() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+
+inline float CarControlSP::FordLateral::Builder::getLaneLineLeftY() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS);
+}
+inline void CarControlSP::FordLateral::Builder::setLaneLineLeftY(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<2>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarControlSP::FordLateral::Reader::getLaneLineRightY() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+
+inline float CarControlSP::FordLateral::Builder::getLaneLineRightY() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS);
+}
+inline void CarControlSP::FordLateral::Builder::setLaneLineRightY(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<3>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarControlSP::FordLateral::Reader::getLaneLineLeftProb() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+
+inline float CarControlSP::FordLateral::Builder::getLaneLineLeftProb() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS);
+}
+inline void CarControlSP::FordLateral::Builder::setLaneLineLeftProb(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<4>() * ::capnp::ELEMENTS, value);
+}
+
+inline float CarControlSP::FordLateral::Reader::getLaneLineRightProb() const {
+  return _reader.getDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+
+inline float CarControlSP::FordLateral::Builder::getLaneLineRightProb() {
+  return _builder.getDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS);
+}
+inline void CarControlSP::FordLateral::Builder::setLaneLineRightProb(float value) {
+  _builder.setDataField<float>(
+      ::capnp::bounded<5>() * ::capnp::ELEMENTS, value);
+}
+
+inline bool CarControlSP::FordLateral::Reader::hasAlertType() const {
+  return !_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline bool CarControlSP::FordLateral::Builder::hasAlertType() {
+  return !_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS).isNull();
+}
+inline  ::capnp::Text::Reader CarControlSP::FordLateral::Reader::getAlertType() const {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_reader.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline  ::capnp::Text::Builder CarControlSP::FordLateral::Builder::getAlertType() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::get(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
+}
+inline void CarControlSP::FordLateral::Builder::setAlertType( ::capnp::Text::Reader value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::set(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), value);
+}
+inline  ::capnp::Text::Builder CarControlSP::FordLateral::Builder::initAlertType(unsigned int size) {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::init(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), size);
+}
+inline void CarControlSP::FordLateral::Builder::adoptAlertType(
+    ::capnp::Orphan< ::capnp::Text>&& value) {
+  ::capnp::_::PointerHelpers< ::capnp::Text>::adopt(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS), kj::mv(value));
+}
+inline ::capnp::Orphan< ::capnp::Text> CarControlSP::FordLateral::Builder::disownAlertType() {
+  return ::capnp::_::PointerHelpers< ::capnp::Text>::disown(_builder.getPointerField(
+      ::capnp::bounded<2>() * ::capnp::POINTERS));
 }
 
 inline bool CarControlSP::Param::Reader::hasKey() const {

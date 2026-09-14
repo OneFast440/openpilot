@@ -10,9 +10,10 @@ from opendbc.car.ford.values import FordSafetyFlags
 from opendbc.car.structs import CarParams
 from opendbc.sunnypilot.car.ford.fordcan_ext import SHADOW_CURVATURE_SCALE
 from opendbc.sunnypilot.car.ford.values_ext import (
+  CURV_MODE_PATH_ANGLE_MAX,
   FORD_DBC_PATH_ANGLE_MAX,
   FORD_DBC_PATH_ANGLE_MIN,
-  FordSafetyFlagsSP,
+  PrimaryLateralControl,
 )
 from opendbc.safety.tests.libsafety import libsafety_py
 from opendbc.safety.tests.common import CANPackerSafety
@@ -547,6 +548,25 @@ class TestFordLongitudinalSafetyBase(TestFordSafetyBase):
           self.assertEqual(should_tx, self._tx(self._acc_command_msg(self.INACTIVE_GAS, brake, brake_actuation)))
 
 
+class TestFordStockSafety(TestFordSafetyBase):
+  """CAN vehicle on Ford's own ACC. Upstream always allowed ACCDATA here; sunnypilot follows the
+  alpha longitudinal toggle, so with it off the message is not in the allowlist."""
+  STEER_MESSAGE = MSG_LateralMotionControl
+
+  TX_MSGS = [
+    [MSG_Steering_Data_FD1, 0], [MSG_Steering_Data_FD1, 2], [MSG_ACCDATA_3, 0], [MSG_Lane_Assist_Data1, 0],
+    [MSG_LateralMotionControl, 0], [MSG_IPMA_Data, 0],
+  ]
+  RELAY_MALFUNCTION_ADDRS = {0: (MSG_ACCDATA_3, MSG_Lane_Assist_Data1, MSG_LateralMotionControl, MSG_IPMA_Data)}
+  FWD_BLACKLISTED_ADDRS = {2: [MSG_ACCDATA_3, MSG_Lane_Assist_Data1, MSG_LateralMotionControl, MSG_IPMA_Data]}
+
+  def setUp(self):
+    self.packer = CANPackerSafety("ford_lincoln_base_pt")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_safety_hooks(CarParams.SafetyModel.ford, 0)
+    self.safety.init_tests()
+
+
 class TestFordLongitudinalSafety(TestFordLongitudinalSafetyBase):
   STEER_MESSAGE = MSG_LateralMotionControl
 
@@ -563,8 +583,7 @@ class TestFordLongitudinalSafety(TestFordLongitudinalSafetyBase):
   def setUp(self):
     self.packer = CANPackerSafety("ford_lincoln_base_pt")
     self.safety = libsafety_py.libsafety
-    # Make sure we enforce long safety even without long flag for CAN
-    self.safety.set_safety_hooks(CarParams.SafetyModel.ford, 0)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.ford, FordSafetyFlags.LONG_CONTROL)
     self.safety.init_tests()
 
 
@@ -588,20 +607,23 @@ class TestFordCANFDLongitudinalSafety(TestFordLongitudinalSafetyBase):
     self.safety.init_tests()
 
 
-# *** sunnypilot: path-angle-primary lateral control (angle control) ***
+# *** sunnypilot: BluePilot lateral control ***
 #
-# A separate branch in ford.h, reached only when the SP safety param selects it. The stock
-# curvature path above is unchanged and is covered by every test in this file; these tests cover
-# the angle branch only.
+# A separate branch in ford.h, reached only when the SP safety param selects it. The stock path
+# above is unchanged and is covered by every test in this file; these cover the two BluePilot
+# modes. Curvature mode additionally runs the whole stock suite, at the bottom of this file,
+# because c2 is still the actuator there and must keep every stock protection.
 
 PATH_ANGLE_TO_CAN = 2000            # 1 / 0.0005 rad per LSB
 PATH_ANGLE_ROC_BP = [10., 15., 25.]
 PATH_ANGLE_ROC_V = [0.0561, 0.04335, 0.00918]
 
 
-class TestFordAngleControlSafetyBase(unittest.TestCase):
+class FordBluePilotSafetyHarness(unittest.TestCase):
+  """Shared setup for the two BluePilot lateral modes."""
   STEER_MESSAGE = 0
   SAFETY_PARAM = 0
+  LATERAL_MODE = 0
 
   MAX_CURVATURE = 0.02
   MAX_CURVATURE_ERROR = 0.002
@@ -614,17 +636,18 @@ class TestFordAngleControlSafetyBase(unittest.TestCase):
 
   @classmethod
   def setUpClass(cls):
-    if cls.__name__ == "TestFordAngleControlSafetyBase":
+    if cls.__name__ in ("FordBluePilotSafetyHarness", "TestFordAngleControlSafetyBase",
+                        "TestFordCurvatureControlSafetyBase"):
       raise unittest.SkipTest
 
   def setUp(self):
     self.packer = CANPackerSafety("ford_lincoln_base_pt")
     self.safety = libsafety_py.libsafety
-    self.safety.set_current_safety_param_sp(FordSafetyFlagsSP.ANGLE_CONTROL)
+    self.safety.set_current_safety_param_sp(self.LATERAL_MODE)
     self.safety.set_safety_hooks(CarParams.SafetyModel.ford, self.SAFETY_PARAM)
     self.safety.init_tests()
-    # init_tests zeroes the SP param; restore it so a mid-test _reset_safety_hooks keeps angle mode
-    self.safety.set_current_safety_param_sp(FordSafetyFlagsSP.ANGLE_CONTROL)
+    # init_tests zeroes the SP param; restore it so a mid-test _reset_safety_hooks keeps the mode
+    self.safety.set_current_safety_param_sp(self.LATERAL_MODE)
 
   def _rx(self, msg):
     return self.safety.safety_rx_hook(msg)
@@ -701,6 +724,10 @@ class TestFordAngleControlSafetyBase(unittest.TestCase):
   @staticmethod
   def _path_angle_roc(speed: float) -> float:
     return float(np.interp(speed - 1.0, PATH_ANGLE_ROC_BP, PATH_ANGLE_ROC_V))
+
+
+class TestFordAngleControlSafetyBase(FordBluePilotSafetyHarness):
+  LATERAL_MODE = int(PrimaryLateralControl.angle)
 
   def test_angle_mode_is_active(self):
     """The SP param actually selected the angle branch, so the rest of these tests mean something.
@@ -878,6 +905,119 @@ class TestFordAngleControlSafety(TestFordAngleControlSafetyBase):
 class TestFordCANFDAngleControlSafety(TestFordAngleControlSafetyBase):
   STEER_MESSAGE = MSG_LateralMotionControl2
   SAFETY_PARAM = FordSafetyFlags.CANFD
+
+
+class TestFordCurvatureControlSafetyBase(FordBluePilotSafetyHarness):
+  """Curvature mode keeps c2 as the actuator, so the stock curvature protections still apply and
+  are covered by the whole-suite subclasses below. These cover what curvature mode adds: a c1
+  trim under a far tighter cap than the signal allows, and c0 still pinned."""
+  LATERAL_MODE = int(PrimaryLateralControl.curvature)
+
+  # mirrors lateral_curv_ext.py _LC_PATH_ANGLE_ROC_*, x1.02
+  CURV_ROC_BP = [5., 15., 25.]
+  CURV_ROC_V = [0.00306, 0.00153, 0.00204]
+
+  def _curv_roc(self, speed: float) -> float:
+    return float(np.interp(speed - 1.0, self.CURV_ROC_BP, self.CURV_ROC_V))
+
+  def test_path_angle_capped_far_below_the_dbc_range(self):
+    """c1 only trims lane position here. Angle mode may use the whole signal range; this must not."""
+    speed = 20.0
+    roc = self._curv_roc(speed)
+    for sign in (1.0, -1.0):
+      self._engage(speed)
+      angle = 0.0
+      # ramp to the cap, which must be reachable
+      while abs(angle) < CURV_MODE_PATH_ANGLE_MAX - roc:
+        angle += sign * roc
+        self.assertTrue(self._tx(self._lat_ctl_msg(True, angle)), f"blocked at {angle}")
+      self.assertTrue(self._tx(self._lat_ctl_msg(True, sign * CURV_MODE_PATH_ANGLE_MAX)))
+      # and one step past it must not be
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, sign * (CURV_MODE_PATH_ANGLE_MAX + roc))),
+                       f"path_angle past {CURV_MODE_PATH_ANGLE_MAX} was allowed")
+
+  def test_angle_mode_range_is_not_reachable(self):
+    """The wide path_angle range belongs to angle mode alone; selecting curvature must not give
+    access to it, whatever the LKA message claims."""
+    self._engage(20.0)
+    self.assertTrue(self._tx(self._lka_msg(True, 0.0)))
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, FORD_DBC_PATH_ANGLE_MAX * 0.9)))
+
+  def test_path_angle_rate_limit(self):
+    for speed in (10.0, 20.0, 30.0):
+      roc = self._curv_roc(speed)
+      for sign in (1.0, -1.0):
+        self._engage(speed)
+        self.assertTrue(self._tx(self._lat_ctl_msg(True, sign * roc * 0.9)))
+        self._engage(speed)
+        self.assertFalse(self._tx(self._lat_ctl_msg(True, sign * roc * 4.0)),
+                         f"step of {roc * 4.0} allowed at {speed} m/s")
+
+  def test_path_angle_inactive_when_not_steering(self):
+    self._engage()
+    self.assertTrue(self._tx(self._lat_ctl_msg(False, 0.0)))
+    self.assertFalse(self._tx(self._lat_ctl_msg(False, 0.01)))
+
+  def test_path_offset_must_stay_inactive(self):
+    """c0 and c1 fight each other on this platform, so openpilot never sends c0."""
+    for path_offset in (-1.0, -0.02, 0.02, 1.0):
+      self._engage()
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, path_offset=path_offset)))
+
+  def test_curvature_rate_is_allowed(self):
+    """c3 is a real signal in curvature mode, unlike angle mode where it stays at its sentinel."""
+    self._engage()
+    self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0, curvature_rate=0.0005)))
+
+
+class TestFordCurvatureControlSafety(TestFordCurvatureControlSafetyBase):
+  STEER_MESSAGE = MSG_LateralMotionControl
+  SAFETY_PARAM = 0
+
+
+class TestFordCANFDCurvatureControlSafety(TestFordCurvatureControlSafetyBase):
+  STEER_MESSAGE = MSG_LateralMotionControl2
+  SAFETY_PARAM = FordSafetyFlags.CANFD
+
+
+class CurvatureModeMixin:
+  """Re-runs a whole stock test class with curvature mode selected. c2 is still the actuator
+  there, so every protection the stock branch has must survive the switch."""
+
+  def setUp(self):
+    # before the parent's set_safety_hooks, which is what reads it, and again afterwards because
+    # init_tests zeroes it and a later _reset_safety_hooks would otherwise drop back to stock
+    libsafety_py.libsafety.set_current_safety_param_sp(int(PrimaryLateralControl.curvature))
+    super().setUp()
+    self.safety.set_current_safety_param_sp(int(PrimaryLateralControl.curvature))
+
+  def test_steer_allowed(self):
+    """The stock version of this asserts the three trim signals must be zero, which is exactly
+    what curvature mode relaxes. Everything it says about c2 still holds, so sweep that with the
+    trim signals at their sentinels."""
+    for speed in (self.CURVATURE_ERROR_MIN_SPEED - 1, self.CURVATURE_ERROR_MIN_SPEED + 1):
+      max_curvature_can = self._get_max_curvature_can(speed)
+      for controls_allowed in (True, False):
+        for steer_control_enabled in (True, False):
+          for curvature in (-self.MAX_CURVATURE, -0.001, 0, 0.001, self.MAX_CURVATURE):
+            self.safety.set_controls_allowed(controls_allowed)
+            self._set_prev_desired_angle(curvature)
+            self._reset_curvature_measurement(curvature, speed)
+
+            should_tx = controls_allowed if steer_control_enabled else curvature == 0
+            should_tx = should_tx and abs(round(curvature * self.DEG_TO_CAN)) <= max_curvature_can
+
+            with self.subTest(controls_allowed=controls_allowed, steer_control_enabled=steer_control_enabled,
+                              curvature=float(curvature)):
+              self.assertEqual(should_tx, self._tx(self._lat_ctl_msg(steer_control_enabled, 0, 0, curvature, 0)))
+
+
+class TestFordCurvatureModeStockSuite(CurvatureModeMixin, TestFordLongitudinalSafety):
+  pass
+
+
+class TestFordCANFDCurvatureModeStockSuite(CurvatureModeMixin, TestFordCANFDLongitudinalSafety):
+  pass
 
 
 if __name__ == "__main__":

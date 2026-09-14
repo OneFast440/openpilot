@@ -122,6 +122,19 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "FordHighSpeedFactor_ang",
     "FordHighSpeedDampening_ang",
     "FordLaneChangeFactor_ang",
+    "FordHumanTurnDetection_curv",
+    "FordLaneChangeFactor_curv",
+    "FordCustomProfile_curv",
+    "FordBlendRatioLow_curv",
+    "FordBlendRatioHigh_curv",
+    "FordLanePositioning_curv",
+    "FordLanePositioningGain_curv",
+    "FordLaneFullMode_curv",
+    "FordPathOffset_curv",
+    "FordFollowControl",
+    "FordDownhillCompensation",
+    "FordHandsFreeClusterMsg",
+    "FordDriverMonitorCanMsg",
   ])
 
   # hyundai

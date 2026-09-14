@@ -23,14 +23,13 @@ executes the commanded angle directly, with no filter state to unwind.
 
 Background: https://bluepilot.dev/announcements/
 """
-from collections import namedtuple
-
 from numpy import clip, interp
 
 from opendbc.car import DT_CTRL
 from opendbc.car.ford.values import CarControllerParams
 from opendbc.car.lateral import MAX_LATERAL_ACCEL
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
+from opendbc.sunnypilot.car.ford.lateral_common import INACTIVE_RESULT, FordLateralResult, get_current_curvature
 from opendbc.sunnypilot.car.ford.values_ext import (
   CURVATURE_MAX,
   FORD_DBC_PATH_ANGLE_MAX,
@@ -42,21 +41,6 @@ from opendbc.sunnypilot.car.ford.values_ext import (
   T_IDXS,
   platform_path_angle_gains,
 )
-
-# Signals angle control produces for one lateral frame. c0/c2/c3 are always at their inactive
-# sentinels here; they are carried so the CAN packing stays identical between modes.
-FordLateralResult = namedtuple('FordLateralResult', [
-  'apply_curvature',    # c2, always 0.0 in angle mode
-  'curvature_rate',     # c3, always 0.0 in angle mode
-  'path_offset',        # c0, always 0.0 in angle mode
-  'path_angle',         # c1, the actuator
-  'ramp_type',
-  'precision_type',
-  'lat_inactive',       # True -> carcontroller must send mode 0 for this frame
-])
-# The kappa path_angle was derived from rides on the LKA message at 33 Hz, out of step with this
-# 20 Hz result, so the car controller reads it off LateralAngleExt.shadow_curvature rather than
-# from here -- one source of truth.
 
 _STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL  # 20 Hz lateral tick
 
@@ -131,17 +115,6 @@ _STALL_MAX_BLIPS = 3              # give up on a stuck episode rather than pulsi
 _PRESS_BLIP_MIN_S = 0.5
 _BLIP_MAX_PATH_ANGLE = 0.10       # rad -- the pulse releases steering for 300 ms; never in a curve
 
-_INACTIVE_RESULT = FordLateralResult(
-  apply_curvature=0.0,
-  curvature_rate=0.0,
-  path_offset=0.0,
-  path_angle=0.0,
-  ramp_type=0,
-  precision_type=1,
-  lat_inactive=True,
-)
-
-
 def _tuned(value: float, spec: tuple[float, float, float]) -> float:
   """Clamp a user tuning factor, falling back to the default when unset.
 
@@ -191,16 +164,6 @@ class LateralAngleExt:
 
     self.lane_change = False
 
-  @staticmethod
-  def get_current_curvature(CS) -> float:
-    """Measured curvature of the car right now, in openpilot's sign convention.
-
-    Derived from the RCM yaw rate, the same source safety/modes/ford.h builds its measured
-    curvature from. The shadow value judged against that check has to come from the same
-    measurement as the check's own reference, so every consumer reads it through here.
-    """
-    return -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
-
   def _reset(self, CS, actuators=None) -> FordLateralResult:
     """Zero the command and publish a truthful shadow. Used by the inactive, human-turn and
     stall-blip paths, which all put mode 0 on the wire."""
@@ -210,10 +173,10 @@ class LateralAngleExt:
     # panda latches it from every such frame regardless of whether lateral is active. Parking it
     # at a stale zero would make the first enabled LMC frame after re-engage race that latch
     # against a real measured curvature, so track reality here instead.
-    self.shadow_curvature = self.get_current_curvature(CS)
+    self.shadow_curvature = get_current_curvature(CS)
     if actuators is not None:
       self.desired_curvature_last = float(actuators.curvature)
-    return _INACTIVE_RESULT
+    return INACTIVE_RESULT
 
   def _clear_stall_state(self) -> None:
     self.stall_blip_hold_s = 0.0
@@ -315,7 +278,7 @@ class LateralAngleExt:
     # on a genuine divergence. Clipping the steering intent itself, not just the reported value,
     # is what keeps that check meaningful.
     kappa_cmd = float(requested_curvature)
-    current_curvature = self.get_current_curvature(CS)
+    current_curvature = get_current_curvature(CS)
     self.curvature_deviation_limited = False
     if v_ego > 9:
       kappa_pre_clip = kappa_cmd
