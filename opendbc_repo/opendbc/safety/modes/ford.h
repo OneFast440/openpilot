@@ -95,6 +95,152 @@ static const CurvatureSteeringLimits FORD_STEERING_LIMITS = {
   .max_steer_power = 0,               // disabled, Ford has no steed power signal
 };
 
+// *** sunnypilot: path-angle-primary lateral control ("angle control", from BluePilot) ***
+//
+// Angle control steers with path_angle (c1) and holds curvature (c2), curvature rate (c3) and
+// path offset (c0) at their inactive sentinels, because the PSCM low-pass filters c2 for up to a
+// second and keeps acting on a stale command. c1 has no such filter state.
+//
+// Selected once at car init via the sunnypilot safety param (current_safety_param_sp, delivered
+// over USB 0xdf before the safety model is set -- a separate uint16 from ford_init's own param;
+// same pattern as Subaru STOP_AND_GO). The checks below are a separate, self-contained branch:
+// with angle control off, not one byte of the stock path changes.
+
+// LatCtlPath_An_Actl scaling: 0.0005 rad per LSB. path_angle is the actuator in angle mode, so it
+// may use the full signal range; the stock path leaves it at its sentinel.
+// There is no value limit to enforce here: the signal is 11 bits, so the extraction above yields
+// 0..2047, and subtracting FORD_INACTIVE_PATH_ANGLE gives exactly [-1000, 1047] CAN units, i.e.
+// the DBC's own [-0.5, 0.5235] rad range. The wire format is the limit.
+#define FORD_PATH_ANGLE_TO_CAN 2000.0f
+
+static bool ford_angle_control = false;       // set in ford_init, never changes during a drive
+static bool ford_angle_mode_engaged = false;  // latched out of Lane_Assist_Data1 in ford_tx_hook
+static int ford_shadow_curvature_raw = 0;     // wire units, scale 1e-6 1/m
+static int ford_desired_path_angle_last = 0;
+
+// shadow_curvature is sent at a wire scale of 1e-6 1/m (see fordcan_ext.py); convert to the CAN
+// units the curvature checks use, matching FORD_STEERING_LIMITS.curvature_to_can (50000):
+// raw * 1e-6 * 50000 = raw * 0.05.
+static int ford_shadow_curvature_to_can(int raw) {
+  return ROUND((float)raw * 0.05f);
+}
+
+// path_angle rate-of-change limit. Rate is anchored to the command sequence rather than to a
+// measurement -- there is no "measured path angle" -- so the previous command is recorded even on
+// a violation: holding it stale would desync this window from openpilot's own (tighter) limiter
+// and turn one blocked frame into a runaway of blocked frames.
+static bool ford_path_angle_cmd_checks(int desired_path_angle, bool steer_control_enabled) {
+  bool violation = false;
+
+  // Mirrors the soft rate limit in opendbc/sunnypilot/car/ford/lateral_angle_ext.py (_SOFT_ROC_*),
+  // scaled x1.02 so this backstop is always slightly looser than openpilot's own limit and never
+  // blocks a well-behaved command. Values are per call, and LateralMotionControl(2) is sent once
+  // per CarControllerParams.STEER_STEP (5), i.e. at 20 Hz, not per 100 Hz tick. lookup_t holds
+  // three points; openpilot's 9 and 10 m/s nodes are both 0.055 (flat top), so {10, 15, 25}
+  // reproduces the curve exactly and lower speeds clamp to the first point.
+  static const struct lookup_t FORD_PATH_ANGLE_ROC = {
+    {10., 15., 25.},
+    {0.0561, 0.04335, 0.00918}
+  };
+
+  if (steer_control_enabled) {
+    // fudge the speed by 1 m/s so the limit is always slightly above openpilot's, in case a
+    // newer speed is read between two commands
+    const float fudged_speed = (vehicle_speed.min / VEHICLE_SPEED_FACTOR) - 1.;
+    const int delta = (safety_interpolate(FORD_PATH_ANGLE_ROC, fudged_speed) * FORD_PATH_ANGLE_TO_CAN) + 1.;
+    violation |= safety_max_limit_check(desired_path_angle, ford_desired_path_angle_last + delta,
+                                        ford_desired_path_angle_last - delta);
+  } else {
+    // path_angle must be at its inactive sentinel while not steering
+    violation |= desired_path_angle != 0;
+  }
+
+  ford_desired_path_angle_last = desired_path_angle;
+  if (!(controls_allowed || controls_allowed_lateral)) {
+    ford_desired_path_angle_last = 0;
+  }
+
+  return violation;
+}
+
+// Angle mode pins the curvature signal at its inactive sentinel, so steer_curvature_cmd_checks
+// has nothing to compare against measured curvature and the deviation protection would be lost
+// entirely. openpilot therefore publishes the curvature its path_angle was derived from
+// alongside the LKA message (see fordcan_ext.create_lka_msg), and it is checked here.
+//
+// Narrower than steer_curvature_cmd_checks in one respect: no lateral-jerk rate-of-change term.
+// shadow_curvature is not an actuator -- path_angle is, and it carries its own tuned rate limit
+// above. Imposing a second, curvature-tuned rate limit on a pure cross-check value blocks at low
+// speed for reasons unrelated to how the car is actually steering. The absolute cap, the ISO
+// lateral acceleration cap and the deviation-from-measured band all still apply, so angle mode
+// stays inside the same cornering envelope as every other platform.
+static bool ford_shadow_curvature_checks(int shadow_curvature, bool steer_control_enabled,
+                                         const CurvatureSteeringLimits limits) {
+  static const float MAX_LATERAL_ACCEL = ISO_LATERAL_ACCEL + (EARTH_G * AVERAGE_ROAD_ROLL);  // ~3.6 m/s^2
+  bool violation = false;
+
+  if (steer_control_enabled) {
+    violation |= safety_max_limit_check(shadow_curvature, limits.max_curvature, -limits.max_curvature);
+
+    // *** ISO lateral accel limit ***
+    const float fudged_speed = SAFETY_MAX((vehicle_speed.min / VEHICLE_SPEED_FACTOR) - 1.0, 1.0);
+    const int max_curvature_can = (MAX_LATERAL_ACCEL / (fudged_speed * fudged_speed) * limits.curvature_to_can) + 1.;
+    violation |= safety_max_limit_check(shadow_curvature, max_curvature_can, -max_curvature_can);
+
+    if ((limits.max_curvature_error != 0) &&
+        ((vehicle_speed.values[0] / VEHICLE_SPEED_FACTOR) > limits.curvature_error_min_speed)) {
+      const int lowest_allowed = curvature_state.meas.min - limits.max_curvature_error - 1;
+      const int highest_allowed = curvature_state.meas.max + limits.max_curvature_error + 1;
+      violation |= safety_max_limit_check(shadow_curvature, highest_allowed, lowest_allowed);
+    }
+  }
+
+  return violation;
+}
+
+static bool ford_angle_mode_tx_checks(bool steer_control_enabled, unsigned int raw_curvature,
+                                      unsigned int raw_curvature_rate, unsigned int raw_path_angle,
+                                      unsigned int raw_path_offset, unsigned int inactive_curvature_rate) {
+  bool violation = false;
+
+  // Ford adjusts its limits by speed, so it checks two speed sources against each other and drops
+  // controls when they disagree. steer_curvature_cmd_checks does this for the stock path; angle
+  // mode does not call it, so do it here, before the controls_allowed gate below sees the result.
+  speed_mismatch_check((float)vehicle_speed_2.values[0] / VEHICLE_SPEED_FACTOR);
+
+  // path_angle is the only actuator in angle mode; everything else stays at its sentinel
+  violation |= raw_curvature != FORD_INACTIVE_CURVATURE;
+  violation |= raw_curvature_rate != inactive_curvature_rate;
+  violation |= raw_path_offset != FORD_INACTIVE_PATH_OFFSET;
+
+  const int desired_path_angle = (int)raw_path_angle - (int)FORD_INACTIVE_PATH_ANGLE;
+  violation |= ford_path_angle_cmd_checks(desired_path_angle, steer_control_enabled);
+
+  violation |= ford_shadow_curvature_checks(ford_shadow_curvature_to_can(ford_shadow_curvature_raw),
+                                            steer_control_enabled, FORD_STEERING_LIMITS);
+
+  // path_angle's rate limit is per message, so without this openpilot could slew five times
+  // faster than intended simply by sending LateralMotionControl at 100 Hz instead of 20 Hz.
+  // steer_curvature_cmd_checks does this for the stock path; angle mode does not call it, and
+  // curvature_state's real-time window is otherwise unused here.
+  if (steer_control_enabled) {
+    violation |= rt_curvature_rate_limit_check(FORD_STEERING_LIMITS);
+  }
+
+  // Corroboration: the LKA message must independently say angle mode is engaged before
+  // path_angle is allowed to leave its sentinel, so one crafted LateralMotionControl frame
+  // cannot steer on its own.
+  violation |= steer_control_enabled && !ford_angle_mode_engaged;
+
+  // No lateral control at all when controls are not allowed
+  violation |= steer_control_enabled && !(controls_allowed || controls_allowed_lateral);
+
+  // keep the stock path's state coherent: nothing is ever commanded on the curvature signal here
+  curvature_state.desired_last = 0;
+
+  return violation;
+}
+
 static void ford_rx_hook(const CANPacket_t *msg) {
   if (msg->bus == FORD_MAIN_BUS) {
     // Update in motion state from standstill signal
@@ -224,6 +370,17 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
     if (action != 0U) {
       tx = false;
     }
+
+    // sunnypilot: angle control carries angle_mode_engaged and shadow_curvature in bits of this
+    // message that no DBC signal maps to (byte 4 bit 0, bytes 5-6; see fordcan_ext.create_lka_msg
+    // for the layout). Read straight out of the frame being transmitted, in the same tx_hook call
+    // that already reads LkaActvStats_D2_Req above -- panda does not self-receive its own TX, so
+    // a dedicated CAN id would never arrive.
+    if (ford_angle_control) {
+      ford_angle_mode_engaged = (msg->data[4] & 0x1U) != 0U;
+      const uint32_t shadow_unsigned = ((uint32_t)msg->data[5] << 8) | (uint32_t)msg->data[6];
+      ford_shadow_curvature_raw = (shadow_unsigned > 32767U) ? ((int)shadow_unsigned - 65536) : (int)shadow_unsigned;
+    }
   }
 
   // Safety check for LateralMotionControl action
@@ -235,12 +392,18 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
     unsigned int raw_path_angle = (msg->data[3] << 3) | (msg->data[4] >> 5);
     unsigned int raw_path_offset = (msg->data[5] << 2) | (msg->data[6] >> 6);
 
-    // These signals are not yet tested with the current safety limits
-    bool violation = (raw_curvature_rate != FORD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
+    bool violation;
+    if (ford_angle_control) {
+      violation = ford_angle_mode_tx_checks(steer_control_enabled, raw_curvature, raw_curvature_rate,
+                                            raw_path_angle, raw_path_offset, FORD_INACTIVE_CURVATURE_RATE);
+    } else {
+      // These signals are not yet tested with the current safety limits
+      violation = (raw_curvature_rate != FORD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
 
-    // Check angle error and steer_control_enabled
-    int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
-    violation |= steer_curvature_cmd_checks(desired_curvature, 0, steer_control_enabled, FORD_STEERING_LIMITS);
+      // Check angle error and steer_control_enabled
+      int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
+      violation |= steer_curvature_cmd_checks(desired_curvature, 0, steer_control_enabled, FORD_STEERING_LIMITS);
+    }
 
     if (violation) {
       tx = false;
@@ -256,12 +419,18 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
     unsigned int raw_path_angle = ((msg->data[3] & 0x1FU) << 6) | (msg->data[4] >> 2);
     unsigned int raw_path_offset = ((msg->data[4] & 0x3U) << 8) | msg->data[5];
 
-    // These signals are not yet tested with the current safety limits
-    bool violation = (raw_curvature_rate != FORD_CANFD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
+    bool violation;
+    if (ford_angle_control) {
+      violation = ford_angle_mode_tx_checks(steer_control_enabled, raw_curvature, raw_curvature_rate,
+                                            raw_path_angle, raw_path_offset, FORD_CANFD_INACTIVE_CURVATURE_RATE);
+    } else {
+      // These signals are not yet tested with the current safety limits
+      violation = (raw_curvature_rate != FORD_CANFD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
 
-    // Check angle error and steer_control_enabled
-    int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
-    violation |= steer_curvature_cmd_checks(desired_curvature, 0, steer_control_enabled, FORD_STEERING_LIMITS);
+      // Check angle error and steer_control_enabled
+      int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
+      violation |= steer_curvature_cmd_checks(desired_curvature, 0, steer_control_enabled, FORD_STEERING_LIMITS);
+    }
 
     if (violation) {
       tx = false;
@@ -316,6 +485,15 @@ static safety_config ford_init(uint16_t param) {
 
   const uint16_t FORD_PARAM_CANFD = 2;
   const bool ford_canfd = GET_FLAG(param, FORD_PARAM_CANFD);
+
+  // sunnypilot: angle control, from the SP safety param. openpilot sets the matching
+  // CP_SP.fordLateralTuning at the same moment it sets this flag, so the two layers can never
+  // disagree about which signal is steering.
+  const uint16_t FORD_PARAM_SP_ANGLE_CONTROL = 1;
+  ford_angle_control = GET_FLAG(current_safety_param_sp, FORD_PARAM_SP_ANGLE_CONTROL);
+  ford_angle_mode_engaged = false;
+  ford_shadow_curvature_raw = 0;
+  ford_desired_path_angle_last = 0;
 
   safety_config ret;
   if (ford_canfd) {

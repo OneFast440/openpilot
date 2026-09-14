@@ -5,6 +5,9 @@ from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, apply_hystere
 from opendbc.car.ford import fordcan
 from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
 from opendbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
+from opendbc.sunnypilot.car.ford import fordcan_ext
+from opendbc.sunnypilot.car.ford.lateral_angle_ext import LateralAngleExt
+from opendbc.sunnypilot.car.ford.values_ext import PrimaryLateralControl
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
@@ -40,6 +43,12 @@ class CarController(CarControllerBase):
 
     self.apply_curvature_last = 0
     self.anti_overshoot_curvature_last = 0
+
+    # sunnypilot: path-angle-primary lateral control (BluePilot). Selected once at car init,
+    # because the matching panda safety flag is set from the same read.
+    self.angle_control = CP_SP.fordLateralTuning.primaryControl == PrimaryLateralControl.angle
+    self.lat_angle = LateralAngleExt(CP, CP_SP) if self.angle_control else None
+
     self.accel = 0.0
     self.gas = 0.0
     self.brake_request = False
@@ -73,7 +82,29 @@ class CarController(CarControllerBase):
 
     ### lateral control ###
     # send steer msg at 20Hz
-    if (self.frame % CarControllerParams.STEER_STEP) == 0:
+    if (self.frame % CarControllerParams.STEER_STEP) == 0 and self.angle_control:
+      # sunnypilot: steer with path_angle (c1) and hold curvature (c2) at its inactive sentinel.
+      # The PSCM low-pass filters c2 for up to a second, which is what produced the ping-pong on
+      # Fords; c1 has no such filter state. See lateral_angle_ext.py.
+      lat = self.lat_angle.update(CC, CC_SP, CS, actuators)
+      # The human-turn override and the stall blip both drop to mode 0 rather than freezing a
+      # command the PSCM has to reconcile later. Every check in safety/modes/ford.h has a
+      # legitimate !steer_control_enabled branch, so those frames need no safety bypass.
+      lat_active = CC.latActive and not lat.lat_inactive
+      self.apply_curvature_last = 0.0
+
+      if self.CP.flags & FordFlags.CANFD:
+        mode = 1 if lat_active else 0
+        counter = (self.frame // CarControllerParams.STEER_STEP) % 0x10
+        can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, -lat.path_offset, -lat.path_angle,
+                                                     -lat.apply_curvature, -lat.curvature_rate, counter,
+                                                     lat.ramp_type, lat.precision_type))
+      else:
+        can_sends.append(fordcan.create_lat_ctl_msg(self.packer, self.CAN, lat_active, -lat.path_offset, -lat.path_angle,
+                                                    -lat.apply_curvature, -lat.curvature_rate,
+                                                    lat.ramp_type, lat.precision_type))
+
+    elif (self.frame % CarControllerParams.STEER_STEP) == 0:
       # Bronco and some other cars consistently overshoot curv requests
       # Apply some deadzone + smoothing convergence to avoid oscillations
       if self.CP.carFingerprint in (CAR.FORD_BRONCO_SPORT_MK1, CAR.FORD_F_150_MK14):
@@ -107,7 +138,15 @@ class CarController(CarControllerBase):
 
     # send lka msg at 33Hz
     if (self.frame % CarControllerParams.LKA_STEP) == 0:
-      can_sends.append(fordcan.create_lka_msg(self.packer, self.CAN))
+      if self.angle_control:
+        # Carries angle-mode state to safety/modes/ford.h in bits no DBC signal maps to. Sent
+        # whenever angle mode is configured, not only while engaged: the panda latches the shadow
+        # curvature from every one of these frames, so a stale value here would race the first
+        # enabled LMC frame after re-engage. Negated into the CAN sign convention, same as
+        # path_angle and curvature above.
+        can_sends.append(fordcan_ext.create_lka_msg(self.packer, self.CAN, True, -self.lat_angle.shadow_curvature))
+      else:
+        can_sends.append(fordcan.create_lka_msg(self.packer, self.CAN))
 
     ### longitudinal control ###
     # send acc msg at 50Hz
@@ -173,7 +212,9 @@ class CarController(CarControllerBase):
     self.lead_distance_bars_last = hud_control.leadDistanceBars
 
     new_actuators = actuators.as_builder()
-    new_actuators.curvature = self.apply_curvature_last
+    # In angle mode the curvature signal is pinned at zero on the wire, so report the curvature
+    # path_angle was actually derived from -- otherwise logs show a flat zero for the whole drive.
+    new_actuators.curvature = self.lat_angle.shadow_curvature if self.angle_control else self.apply_curvature_last
     new_actuators.accel = self.accel
     new_actuators.gas = self.gas
 

@@ -64,6 +64,15 @@ class CarParamsSP:
   enableGasInterceptor: bool = auto_field()
 
   neuralNetworkLateralControl: 'CarParamsSP.NeuralNetworkLateralControl' = field(default_factory=lambda: CarParamsSP.NeuralNetworkLateralControl())
+  fordLateralTuning: 'CarParamsSP.FordLateralTuning' = field(default_factory=lambda: CarParamsSP.FordLateralTuning())
+
+  @auto_dataclass
+  class FordLateralTuning:
+    primaryControl: int = auto_field()
+    lowSpeedFactor: float = auto_field()
+    highSpeedFactor: float = auto_field()
+    highSpeedDampening: float = auto_field()
+    laneChangeFactor: float = auto_field()
 
   @auto_dataclass
   class NeuralNetworkLateralControl:
@@ -144,6 +153,14 @@ class CarControlSP:
   leadOne: 'LeadData' = field(default_factory=lambda: LeadData())
   leadTwo: 'LeadData' = field(default_factory=lambda: LeadData())
   intelligentCruiseButtonManagement: 'IntelligentCruiseButtonManagement' = field(default_factory=lambda: IntelligentCruiseButtonManagement())
+  fordLateral: 'CarControlSP.FordLateral' = field(default_factory=lambda: CarControlSP.FordLateral())
+
+  @auto_dataclass
+  class FordLateral:
+    modelCurvatures: list[float] = auto_field()
+    lateralDelay: float = auto_field()
+    laneChangeState: int = auto_field()
+    laneChangeDirection: int = auto_field()
 
   @auto_dataclass
   class Param:

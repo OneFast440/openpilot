@@ -365,6 +365,7 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   enableGasInterceptor @5 :Bool;
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
+  fordLateralTuning @6 :FordLateralTuning;
 
   struct NeuralNetworkLateralControl {
     model @0 :Model;
@@ -375,6 +376,17 @@ struct CarParamsSP @0x80ae746ee2596b11 {
       name @1 :Text;
     }
   }
+
+  # BluePilot-derived Ford angle control. Read once at car init from Params, so a change
+  # needs an onroad cycle -- the panda safety flag is set from the same read and the two
+  # layers must never disagree.
+  struct FordLateralTuning {
+    primaryControl @0 :UInt8;       # 0 = curvature (stock), 1 = angle (path_angle primary)
+    lowSpeedFactor @1 :Float32;     # [0.5, 1.5], default 1.0
+    highSpeedFactor @2 :Float32;    # [0.5, 1.5], default 1.0
+    highSpeedDampening @3 :Float32; # [0.25, 1.25], default 1.0
+    laneChangeFactor @4 :Float32;   # [0.85, 1.5], default 1.0
+  }
 }
 
 struct CarControlSP @0xa5cd762cd951a455 {
@@ -383,6 +395,17 @@ struct CarControlSP @0xa5cd762cd951a455 {
   leadOne @2 :LeadData;
   leadTwo @3 :LeadData;
   intelligentCruiseButtonManagement @4 :IntelligentCruiseButtonManagement;
+  fordLateral @5 :FordLateral;
+
+  # Model/plan values Ford angle control needs. Lives here rather than being read from a
+  # SubMaster inside opendbc, which must not import openpilot.
+  struct FordLateral {
+    # modelV2 orientationRate.z / max(v_ego, 0.01), sampled at ModelConstants.T_IDXS
+    modelCurvatures @0 :List(Float32);
+    lateralDelay @1 :Float32;       # s, from lateralDelay.lateralDelay
+    laneChangeState @2 :UInt8;      # log.LaneChangeState: 0 off, 1 pre, 2 starting, 3 finishing
+    laneChangeDirection @3 :UInt8;  # log.LaneChangeDirection: 0 none, 1 left, 2 right
+  }
 
   struct Param {
     key @0 :Text;

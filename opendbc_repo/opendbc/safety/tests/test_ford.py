@@ -5,8 +5,15 @@ import unittest
 
 import opendbc.safety.tests.common as common
 from opendbc.car.lateral import MAX_LATERAL_ACCEL, MAX_LATERAL_JERK
+from opendbc.safety.tests.common import RT_INTERVAL
 from opendbc.car.ford.values import FordSafetyFlags
 from opendbc.car.structs import CarParams
+from opendbc.sunnypilot.car.ford.fordcan_ext import SHADOW_CURVATURE_SCALE
+from opendbc.sunnypilot.car.ford.values_ext import (
+  FORD_DBC_PATH_ANGLE_MAX,
+  FORD_DBC_PATH_ANGLE_MIN,
+  FordSafetyFlagsSP,
+)
 from opendbc.safety.tests.libsafety import libsafety_py
 from opendbc.safety.tests.common import CANPackerSafety
 
@@ -579,6 +586,298 @@ class TestFordCANFDLongitudinalSafety(TestFordLongitudinalSafetyBase):
     self.safety = libsafety_py.libsafety
     self.safety.set_safety_hooks(CarParams.SafetyModel.ford, FordSafetyFlags.LONG_CONTROL | FordSafetyFlags.CANFD)
     self.safety.init_tests()
+
+
+# *** sunnypilot: path-angle-primary lateral control (angle control) ***
+#
+# A separate branch in ford.h, reached only when the SP safety param selects it. The stock
+# curvature path above is unchanged and is covered by every test in this file; these tests cover
+# the angle branch only.
+
+PATH_ANGLE_TO_CAN = 2000            # 1 / 0.0005 rad per LSB
+PATH_ANGLE_ROC_BP = [10., 15., 25.]
+PATH_ANGLE_ROC_V = [0.0561, 0.04335, 0.00918]
+
+
+class TestFordAngleControlSafetyBase(unittest.TestCase):
+  STEER_MESSAGE = 0
+  SAFETY_PARAM = 0
+
+  MAX_CURVATURE = 0.02
+  MAX_CURVATURE_ERROR = 0.002
+  CURVATURE_ERROR_MIN_SPEED = 10.0
+  DEG_TO_CAN = 50000
+
+  cnt_speed = 0
+  cnt_speed_2 = 0
+  cnt_yaw_rate = 0
+
+  @classmethod
+  def setUpClass(cls):
+    if cls.__name__ == "TestFordAngleControlSafetyBase":
+      raise unittest.SkipTest
+
+  def setUp(self):
+    self.packer = CANPackerSafety("ford_lincoln_base_pt")
+    self.safety = libsafety_py.libsafety
+    self.safety.set_current_safety_param_sp(FordSafetyFlagsSP.ANGLE_CONTROL)
+    self.safety.set_safety_hooks(CarParams.SafetyModel.ford, self.SAFETY_PARAM)
+    self.safety.init_tests()
+    # init_tests zeroes the SP param; restore it so a mid-test _reset_safety_hooks keeps angle mode
+    self.safety.set_current_safety_param_sp(FordSafetyFlagsSP.ANGLE_CONTROL)
+
+  def _rx(self, msg):
+    return self.safety.safety_rx_hook(msg)
+
+  def _tx(self, msg):
+    return self.safety.safety_tx_hook(msg)
+
+  def _speed_msg(self, speed: float):
+    values = {"Veh_V_ActlBrk": speed * 3.6, "VehVActlBrk_D_Qf": 3, "VehVActlBrk_No_Cnt": self.cnt_speed % 16}
+    self.__class__.cnt_speed += 1
+    return self.packer.make_can_msg_safety("BrakeSysFeatures", 0, values, fix_checksum=checksum)
+
+  def _speed_msg_2(self, speed: float):
+    values = {"Veh_V_ActlEng": speed * 3.6, "VehVActlEng_D_Qf": 3, "VehVActlEng_No_Cnt": self.cnt_speed_2 % 16}
+    self.__class__.cnt_speed_2 += 1
+    return self.packer.make_can_msg_safety("EngVehicleSpThrottle2", 0, values, fix_checksum=checksum)
+
+  def _yaw_rate_msg(self, curvature: float, speed: float):
+    values = {"VehYaw_W_Actl": curvature * speed, "VehYawWActl_D_Qf": 3,
+              "VehRollYaw_No_Cnt": self.cnt_yaw_rate % 256}
+    self.__class__.cnt_yaw_rate += 1
+    return self.packer.make_can_msg_safety("Yaw_Data_FD1", 0, values, fix_checksum=checksum)
+
+  def _set_speed_and_curvature(self, speed: float, curvature: float = 0.0):
+    for _ in range(6):
+      self._rx(self._speed_msg(speed))
+      self._rx(self._speed_msg_2(speed))
+      self._rx(self._yaw_rate_msg(curvature, speed))
+
+  def _lka_msg(self, angle_mode_engaged: bool = True, shadow_curvature: float = 0.0, action: int = 0):
+    """Lane_Assist_Data1 with the angle-control bits packed the way fordcan_ext.create_lka_msg does."""
+    addr, dat, bus = self.packer.make_can_msg("Lane_Assist_Data1", 0, {"LkaActvStats_D2_Req": action})
+    dat = bytearray(dat)
+    raw = max(-32768, min(32767, int(round(shadow_curvature / SHADOW_CURVATURE_SCALE)))) & 0xFFFF
+    dat[4] |= 1 if angle_mode_engaged else 0
+    dat[5] = (raw >> 8) & 0xFF
+    dat[6] = raw & 0xFF
+    return libsafety_py.make_CANPacket(addr, bus, dat)
+
+  cnt_lat_ctl = 0
+  LATERAL_FREQUENCY = 20  # Hz
+
+  def _lat_ctl_msg(self, enabled: bool, path_angle: float, path_offset: float = 0.0,
+                   curvature: float = 0.0, curvature_rate: float = 0.0, increment_timer: bool = True):
+    if increment_timer:
+      self.safety.set_timer(self.cnt_lat_ctl * int(1e6 / self.LATERAL_FREQUENCY))
+      self.__class__.cnt_lat_ctl += 1
+    if self.STEER_MESSAGE == MSG_LateralMotionControl:
+      values = {
+        "LatCtl_D_Rq": 1 if enabled else 0,
+        "LatCtlPathOffst_L_Actl": path_offset,
+        "LatCtlPath_An_Actl": path_angle,
+        "LatCtlCurv_NoRate_Actl": curvature_rate,
+        "LatCtlCurv_No_Actl": curvature,
+      }
+      return self.packer.make_can_msg_safety("LateralMotionControl", 0, values)
+    values = {
+      "LatCtl_D2_Rq": 1 if enabled else 0,
+      "LatCtlPathOffst_L_Actl": path_offset,
+      "LatCtlPath_An_Actl": path_angle,
+      "LatCtlCrv_NoRate2_Actl": curvature_rate,
+      "LatCtlCurv_No_Actl": curvature,
+    }
+    return self.packer.make_can_msg_safety("LateralMotionControl2", 0, values)
+
+  def _engage(self, speed: float = 30.0, curvature: float = 0.0, shadow: float = 0.0):
+    """Speed/measurement primed, controls allowed, LKA corroborating, path_angle history at zero."""
+    self._set_speed_and_curvature(speed, curvature)
+    self.safety.set_controls_allowed(False)
+    self.assertTrue(self._tx(self._lat_ctl_msg(False, 0.0)))
+    self.safety.set_controls_allowed(True)
+    self.assertTrue(self._tx(self._lka_msg(True, shadow)))
+
+  @staticmethod
+  def _path_angle_roc(speed: float) -> float:
+    return float(np.interp(speed - 1.0, PATH_ANGLE_ROC_BP, PATH_ANGLE_ROC_V))
+
+  def test_angle_mode_is_active(self):
+    """The SP param actually selected the angle branch, so the rest of these tests mean something.
+    In the stock branch a nonzero path_angle is always blocked; here a small one is allowed."""
+    self._engage()
+    self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.005)))
+
+  def test_curvature_must_stay_inactive(self):
+    """path_angle is the only actuator in angle mode; c2 must sit at its sentinel."""
+    self._engage()
+    for curvature in (-0.02, -0.001, 0.001, 0.02):
+      self._engage()
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, curvature=curvature)),
+                       f"curvature {curvature} was allowed in angle mode")
+
+  def test_curvature_rate_and_path_offset_must_stay_inactive(self):
+    for path_offset in (-1.0, -0.02, 0.02, 1.0):
+      self._engage()
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, path_offset=path_offset)))
+    for curvature_rate in (-0.001, -0.00005, 0.00005, 0.001):
+      self._engage()
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, curvature_rate=curvature_rate)))
+
+  def test_path_angle_can_reach_the_full_dbc_range(self):
+    """path_angle is the actuator in angle mode, so the whole signal range must be reachable one
+    rate-limited step at a time. Nothing beyond it needs checking: the signal is 11 bits, so
+    [-0.5, 0.5235] rad is exactly what the wire can express."""
+    for speed in (12.0, 30.0):
+      roc = self._path_angle_roc(speed)
+      for limit in (FORD_DBC_PATH_ANGLE_MAX, FORD_DBC_PATH_ANGLE_MIN):
+        sign = 1.0 if limit > 0 else -1.0
+        self._engage(speed)
+        angle = 0.0
+        while abs(angle) < abs(limit) - roc:
+          angle += sign * roc
+          self.assertTrue(self._tx(self._lat_ctl_msg(True, angle)),
+                          f"blocked at {angle} ramping to {limit} at {speed} m/s")
+        self.assertTrue(self._tx(self._lat_ctl_msg(True, limit)))
+
+  def test_path_angle_rate_limit(self):
+    for speed in (12.0, 20.0, 30.0):
+      roc = self._path_angle_roc(speed)
+      for sign in (1.0, -1.0):
+        self._engage(speed)
+        # one step inside the limit is fine
+        self.assertTrue(self._tx(self._lat_ctl_msg(True, sign * roc * 0.9)))
+        # a step well past it is not
+        self._engage(speed)
+        self.assertFalse(self._tx(self._lat_ctl_msg(True, sign * roc * 3.0)),
+                         f"step of {roc * 3.0} allowed at {speed} m/s")
+
+  def test_path_angle_inactive_when_not_steering(self):
+    self._engage()
+    self.assertTrue(self._tx(self._lat_ctl_msg(False, 0.0)))
+    self.assertFalse(self._tx(self._lat_ctl_msg(False, 0.01)))
+
+  def test_no_steering_without_controls_allowed(self):
+    self._engage()
+    self.safety.set_controls_allowed(False)
+    self.safety.set_controls_allowed_lateral(False)
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0)))
+    self.assertTrue(self._tx(self._lat_ctl_msg(False, 0.0)))
+
+  def test_requires_lka_corroboration(self):
+    """A LateralMotionControl frame cannot steer unless the LKA message independently says angle
+    mode is engaged, so one crafted frame cannot unlock path_angle on its own."""
+    self._engage()
+    self.assertTrue(self._tx(self._lka_msg(False, 0.0)))
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0)))
+    self.assertTrue(self._tx(self._lka_msg(True, 0.0)))
+    self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0)))
+
+  def test_shadow_curvature_absolute_limit(self):
+    # below CURVATURE_ERROR_MIN_SPEED the deviation band is off and the lateral accel limit is
+    # far wider than the signal range, so this isolates the absolute cap
+    speed = 5.0
+    for shadow in (-0.03, -0.021, 0.021, 0.03):
+      self._engage(speed, shadow=shadow)
+      self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0)), f"shadow curvature {shadow} allowed")
+    for shadow in (-0.019, 0.0, 0.019):
+      self._engage(speed, shadow=shadow)
+      self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0)), f"shadow curvature {shadow} blocked")
+
+  def test_iso_lateral_accel_limit(self):
+    """Angle mode must stay inside the same cornering envelope as every other platform, even
+    though the curvature signal it would normally be checked on is pinned at zero."""
+    for speed in (15.0, 25.0, 35.0):
+      max_curvature = self._max_curvature_can(speed) / self.DEG_TO_CAN
+      for shadow, should_tx in ((max_curvature * 0.5, True), (max_curvature * 2.0, False)):
+        # keep the measurement alongside the command so the deviation band is not what bites
+        self._engage(speed, curvature=shadow, shadow=shadow)
+        self.assertEqual(should_tx, self._tx(self._lat_ctl_msg(True, 0.0)),
+                         f"{speed} m/s, shadow {shadow}, envelope {max_curvature}")
+
+  def _max_curvature_can(self, speed: float) -> int:
+    fudged_speed = max(speed - 1.0, 1.0)
+    return int(MAX_LATERAL_ACCEL / (fudged_speed * fudged_speed) * self.DEG_TO_CAN) + 1
+
+  def test_shadow_curvature_deviation_from_measured(self):
+    """The car's steering intent is checked against measured curvature even though the curvature
+    signal itself is pinned at zero -- otherwise angle mode has no deviation protection at all."""
+    # above CURVATURE_ERROR_MIN_SPEED, but slow enough that the lateral accel envelope is wider
+    # than the values under test, so the deviation band is what decides
+    speed = 15.0
+    for measured in (-0.01, 0.0, 0.01):
+      for delta in (-0.006, -0.0025, 0.0, 0.0025, 0.006):
+        shadow = measured + delta
+        self._engage(speed, curvature=measured, shadow=shadow)
+        # the measurement is sampled over 6 frames, hence the extra tolerance on the boundary
+        if abs(abs(delta) - self.MAX_CURVATURE_ERROR) < 1e-6:
+          continue
+        self.assertEqual(abs(delta) <= self.MAX_CURVATURE_ERROR, self._tx(self._lat_ctl_msg(True, 0.0)),
+                         f"measured {measured} shadow {shadow}")
+
+  def test_deviation_band_unchecked_below_min_speed(self):
+    speed = self.CURVATURE_ERROR_MIN_SPEED - 2.0
+    self._engage(speed, curvature=0.0, shadow=0.015)
+    self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0)))
+
+  def test_real_time_rate_limit(self):
+    """path_angle is rate limited per message, so the message rate itself has to be bounded --
+    otherwise sending at 100 Hz instead of 20 Hz slews five times faster than intended. Same
+    rolling two-bucket window the stock curvature path uses."""
+    self._engage()
+    max_rt_msgs = int(self.LATERAL_FREQUENCY * RT_INTERVAL / 1e6 * 1.2 + 1)
+    half = RT_INTERVAL // 2
+
+    self.safety.set_timer(0)
+    for i in range(max_rt_msgs * 2):
+      self.assertEqual(i <= max_rt_msgs, self._tx(self._lat_ctl_msg(True, 0.0, increment_timer=False)))
+
+    # shift the overflow into the previous bucket
+    self.safety.set_timer(half)
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, increment_timer=False)))
+
+    # the previous bucket still counts within the half interval
+    self.safety.set_timer(half + 2 * RT_INTERVAL // 5)
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, increment_timer=False)))
+
+    # both buckets clear after a full interval
+    self.safety.set_timer(half + RT_INTERVAL)
+    self.assertFalse(self._tx(self._lat_ctl_msg(True, 0.0, increment_timer=False)))
+    self.safety.set_timer(half + 2 * RT_INTERVAL)
+    for _ in range(max_rt_msgs):
+      self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0, increment_timer=False)))
+
+  def test_speed_mismatch_drops_controls(self):
+    """Ford scales its limits by speed, so a disagreement between the ABS and PCM speed sources
+    must drop controls in angle mode exactly as it does on the stock path."""
+    for speed in np.arange(0, 40, 2.0):
+      for speed_delta in (-3.0, -1.0, 0.0, 1.0, 3.0):
+        speed_2 = round(max(speed + speed_delta, 0), 1)
+        self._rx(self._speed_msg(speed))
+        self._rx(self._speed_msg_2(speed_2))
+        self.safety.set_controls_allowed(True)
+        self._tx(self._lat_ctl_msg(True, 0.0))
+        within_tolerance = abs(speed_2 - speed) <= 2.0
+        self.assertEqual(within_tolerance, self.safety.get_controls_allowed(),
+                         f"speed {speed} vs {speed_2}")
+
+  def test_lka_action_still_blocked(self):
+    """Packing angle-control state into the unused bits must not weaken the existing check that
+    Lane_Assist_Data1 never requests a lane-keeping action."""
+    self._engage()
+    for action in range(1, 8):
+      self.assertFalse(self._tx(self._lka_msg(True, 0.0, action=action)))
+    self.assertTrue(self._tx(self._lka_msg(True, 0.0, action=0)))
+
+
+class TestFordAngleControlSafety(TestFordAngleControlSafetyBase):
+  STEER_MESSAGE = MSG_LateralMotionControl
+  SAFETY_PARAM = 0
+
+
+class TestFordCANFDAngleControlSafety(TestFordAngleControlSafetyBase):
+  STEER_MESSAGE = MSG_LateralMotionControl2
+  SAFETY_PARAM = FordSafetyFlags.CANFD
 
 
 if __name__ == "__main__":

@@ -17,6 +17,14 @@ from opendbc.car.subaru.values import SubaruFlags
 from opendbc.car.toyota.values import ToyotaSafetyFlags
 from opendbc.sunnypilot.car.hyundai.enable_radar_tracks import enable_radar_tracks as hyundai_enable_radar_tracks
 from opendbc.sunnypilot.car.hyundai.longitudinal.helpers import LongitudinalTuningType
+from opendbc.sunnypilot.car.ford.values_ext import (
+  FordSafetyFlagsSP,
+  HIGH_SPEED_DAMPENING_RANGE,
+  HIGH_SPEED_FACTOR_RANGE,
+  LANE_CHANGE_FACTOR_RANGE,
+  LOW_SPEED_FACTOR_RANGE,
+  PrimaryLateralControl,
+)
 from opendbc.sunnypilot.car.hyundai.values import HyundaiFlagsSP
 from opendbc.sunnypilot.car.subaru.values_ext import SubaruFlagsSP, SubaruSafetyFlagsSP
 from opendbc.sunnypilot.car.tesla.values import MadsScreenButtonType, TeslaFlagsSP, TeslaSafetyFlagsSP
@@ -90,6 +98,7 @@ def setup_interfaces(CI, CP: structs.CarParams, CP_SP: structs.CarParamsSP,
   _initialize_radar_tracks(CP, CP_SP, can_recv, can_send)
   _initialize_stop_and_go(CP, CP_SP, params_dict)
   _initialize_toyota(CP, CP_SP, params_dict)
+  _initialize_ford(CP, CP_SP, params_dict)
 
 
 def _initialize_custom_longitudinal_tuning(CI, CP: structs.CarParams, CP_SP: structs.CarParamsSP,
@@ -151,6 +160,41 @@ def _initialize_stop_and_go(CP: structs.CarParams, CP_SP: structs.CarParamsSP, p
       CP_SP.flags |= SubaruFlagsSP.STOP_AND_GO_MANUAL_PARKING_BRAKE.value
     if stop_and_go or stop_and_go_manual_parking_brake:
       CP_SP.safetyParam |= SubaruSafetyFlagsSP.STOP_AND_GO
+
+
+def _clamp_tuning(raw, spec: tuple[float, float, float]) -> float:
+  default, lo, hi = spec
+  try:
+    value = float(raw)
+  except (TypeError, ValueError):
+    return default
+  if value == 0.0:
+    return default
+  return float(np.clip(value, lo, hi))
+
+
+def _initialize_ford(CP: structs.CarParams, CP_SP: structs.CarParamsSP, params_dict: dict[str, str]) -> None:
+  """Ford angle control (BluePilot).
+
+  Read once here rather than live in the car controller: the panda safety flag below and the
+  control gains come from the same read, and a live flip against stale firmware would have
+  openpilot fighting the panda. Changing any of these needs an onroad cycle.
+  """
+  if CP.brand != 'ford':
+    return
+
+  primary = int(params_dict.get("FordPrefLateralControl", 0) or 0)
+  if primary != PrimaryLateralControl.angle:
+    return
+
+  CP_SP.fordLateralTuning.primaryControl = int(PrimaryLateralControl.angle)
+  CP_SP.fordLateralTuning.lowSpeedFactor = _clamp_tuning(params_dict.get("FordLowSpeedFactor_ang"), LOW_SPEED_FACTOR_RANGE)
+  CP_SP.fordLateralTuning.highSpeedFactor = _clamp_tuning(params_dict.get("FordHighSpeedFactor_ang"), HIGH_SPEED_FACTOR_RANGE)
+  CP_SP.fordLateralTuning.highSpeedDampening = _clamp_tuning(params_dict.get("FordHighSpeedDampening_ang"),
+                                                             HIGH_SPEED_DAMPENING_RANGE)
+  CP_SP.fordLateralTuning.laneChangeFactor = _clamp_tuning(params_dict.get("FordLaneChangeFactor_ang"),
+                                                           LANE_CHANGE_FACTOR_RANGE)
+  CP_SP.safetyParam |= FordSafetyFlagsSP.ANGLE_CONTROL
 
 
 def _initialize_toyota(CP: structs.CarParams, CP_SP: structs.CarParamsSP, params_dict: dict[str, str]) -> None:

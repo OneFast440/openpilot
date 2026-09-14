@@ -18,6 +18,13 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
+FORD_PRIMARY_LATERAL_ANGLE = 1  # opendbc.sunnypilot.car.ford.values_ext.PrimaryLateralControl.angle
+
+# capnp enum name -> the small ints CarControlSP.FordLateral carries. Kept as a lookup rather
+# than a .raw read so a reordered log.capnp enum cannot silently change the wire meaning.
+LANE_CHANGE_STATE = {'off': 0, 'preLaneChange': 1, 'laneChangeStarting': 2, 'laneChangeFinishing': 3}
+LANE_CHANGE_DIRECTION = {'none': 0, 'left': 1, 'right': 2}
+
 
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
@@ -33,6 +40,12 @@ class ControlsExt(ModelStateBase):
 
     self.sm_services_ext = ['radarState', 'selfdriveStateSP']
     self.pm_services_ext = ['carControlSP']
+
+    # Ford angle control consumes model curvature + lateral delay. opendbc must not import
+    # openpilot, so the values are published on carControlSP instead of read from a SubMaster
+    # inside the car controller. Only populated when angle mode is actually selected.
+    self.ford_angle_control = (self.CP.brand == 'ford' and
+                               self.CP_SP.fordLateralTuning.primaryControl == FORD_PRIMARY_LATERAL_ANGLE)
 
   def initialize_lateral_control(self, lac, CI, dt):
     enforce_torque_control = self.params.get_bool("EnforceTorqueControl")
@@ -104,7 +117,19 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
+    if self.ford_angle_control:
+      self.get_ford_lateral(CC_SP.fordLateral, sm)
+
     return CC_SP
+
+  @staticmethod
+  def get_ford_lateral(dest, sm: messaging.SubMaster) -> None:
+    model = sm['modelV2']
+    v_ego = max(sm['carState'].vEgo, 0.01)
+    dest.modelCurvatures = [float(z) / v_ego for z in model.orientationRate.z]
+    dest.lateralDelay = float(sm['lateralDelay'].lateralDelay)
+    dest.laneChangeState = LANE_CHANGE_STATE.get(str(model.meta.laneChangeState), 0)
+    dest.laneChangeDirection = LANE_CHANGE_DIRECTION.get(str(model.meta.laneChangeDirection), 0)
 
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:

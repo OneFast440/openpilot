@@ -232,6 +232,13 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BackupManager_RestoreVersion", {PERSISTENT, STRING}},
 
     // sunnypilot car specific params
+    // Ford angle control (BluePilot): path_angle-primary lateral. Read at car init only -- the
+    // panda safety flag is derived from the same read, so changes need an onroad cycle.
+    {"FordPrefLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
+    {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordHighSpeedDampening_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordLaneChangeFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"HyundaiLongitudinalTuning", {PERSISTENT | BACKUP, INT, "0"}},
     {"SubaruStopAndGo", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"SubaruStopAndGoManualParkingBrake", {PERSISTENT | BACKUP, BOOL, "0"}},
