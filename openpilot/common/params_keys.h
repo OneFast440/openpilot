@@ -232,30 +232,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BackupManager_RestoreVersion", {PERSISTENT, STRING}},
 
     // sunnypilot car specific params
-    // Ford (BluePilot). All read at car init only -- the panda's lateral mode and longitudinal
-    // allowlist are derived from the same read, so changes need an onroad cycle.
-    // 0 = stock openpilot, 1 = BluePilot curvature, 2 = BluePilot angle
-    {"FordPrefLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
-    // angle mode
-    {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
-    {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
-    {"FordHighSpeedDampening_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
-    {"FordLaneChangeFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
-    // curvature mode
-    {"FordHumanTurnDetection_curv", {PERSISTENT | BACKUP, BOOL, "1"}},
-    {"FordLaneChangeFactor_curv", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
-    {"FordCustomProfile_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"FordBlendRatioLow_curv", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
-    {"FordBlendRatioHigh_curv", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
-    {"FordLanePositioning_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"FordLanePositioningGain_curv", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
-    {"FordLaneFullMode_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"FordPathOffset_curv", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
-    // longitudinal and cluster
-    {"FordFollowControl", {PERSISTENT | BACKUP, BOOL, "1"}},
-    {"FordDownhillCompensation", {PERSISTENT | BACKUP, BOOL, "1"}},
-    {"FordHandsFreeClusterMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"FordDriverMonitorCanMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HyundaiLongitudinalTuning", {PERSISTENT | BACKUP, INT, "0"}},
     {"SubaruStopAndGo", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"SubaruStopAndGoManualParkingBrake", {PERSISTENT | BACKUP, BOOL, "0"}},

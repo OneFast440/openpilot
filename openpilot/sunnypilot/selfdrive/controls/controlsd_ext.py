@@ -18,14 +18,6 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
-# opendbc.sunnypilot.car.ford.values_ext.PrimaryLateralControl: 0 stock, 1 curvature, 2 angle
-FORD_PRIMARY_LATERAL_STOCK = 0
-
-# capnp enum name -> the small ints CarControlSP.FordLateral carries. Kept as a lookup rather
-# than a .raw read so a reordered log.capnp enum cannot silently change the wire meaning.
-LANE_CHANGE_STATE = {'off': 0, 'preLaneChange': 1, 'laneChangeStarting': 2, 'laneChangeFinishing': 3}
-LANE_CHANGE_DIRECTION = {'none': 0, 'left': 1, 'right': 2}
-
 
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
@@ -41,13 +33,6 @@ class ControlsExt(ModelStateBase):
 
     self.sm_services_ext = ['radarState', 'selfdriveStateSP']
     self.pm_services_ext = ['carControlSP']
-
-    # Ford's BluePilot lateral strategies consume model curvature, lane lines, lateral delay and
-    # driver monitoring state. opendbc must not import openpilot, so the values are published on
-    # carControlSP instead of read from a SubMaster inside the car controller. Only populated
-    # when one of those strategies is actually selected.
-    self.ford_lateral = (self.CP.brand == 'ford' and
-                         self.CP_SP.fordLateralTuning.primaryControl != FORD_PRIMARY_LATERAL_STOCK)
 
   def initialize_lateral_control(self, lac, CI, dt):
     enforce_torque_control = self.params.get_bool("EnforceTorqueControl")
@@ -119,28 +104,7 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
-    if self.ford_lateral:
-      self.get_ford_lateral(CC_SP.fordLateral, sm)
-
     return CC_SP
-
-  @staticmethod
-  def get_ford_lateral(dest, sm: messaging.SubMaster) -> None:
-    model = sm['modelV2']
-    v_ego = max(sm['carState'].vEgo, 0.01)
-    dest.modelCurvatures = [float(z) / v_ego for z in model.orientationRate.z]
-    dest.modelPositionY = [float(y) for y in model.position.y]
-    dest.lateralDelay = float(sm['lateralDelay'].lateralDelay)
-    dest.laneChangeState = LANE_CHANGE_STATE.get(str(model.meta.laneChangeState), 0)
-    dest.laneChangeDirection = LANE_CHANGE_DIRECTION.get(str(model.meta.laneChangeDirection), 0)
-    dest.alertType = sm['selfdriveState'].alertType
-
-    # the two inner lane lines, which curvature mode blends toward for lane centering
-    if len(model.laneLines) >= 3 and len(model.laneLineProbs) >= 3:
-      dest.laneLineLeftY = float(model.laneLines[1].y[0]) if len(model.laneLines[1].y) else 0.0
-      dest.laneLineRightY = float(model.laneLines[2].y[0]) if len(model.laneLines[2].y) else 0.0
-      dest.laneLineLeftProb = float(model.laneLineProbs[1])
-      dest.laneLineRightProb = float(model.laneLineProbs[2])
 
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:
