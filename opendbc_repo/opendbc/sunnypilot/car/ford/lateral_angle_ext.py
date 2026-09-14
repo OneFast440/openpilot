@@ -27,7 +27,6 @@ from numpy import clip, interp
 
 from opendbc.car import DT_CTRL
 from opendbc.car.ford.values import CarControllerParams
-from opendbc.car.lateral import MAX_LATERAL_ACCEL
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from opendbc.sunnypilot.car.ford.lateral_common import INACTIVE_RESULT, FordLateralResult, get_current_curvature
 from opendbc.sunnypilot.car.ford.values_ext import (
@@ -286,13 +285,10 @@ class LateralAngleExt:
                              current_curvature + CarControllerParams.CURVATURE_ERROR))
       self.curvature_deviation_limited = abs(kappa_cmd - kappa_pre_clip) > 1e-9
 
-    # Same cornering envelope every other platform gets. In angle mode the curvature signal is
-    # pinned at zero, so this is the only place the ISO lateral acceleration limit can be applied
-    # on the way to path_angle -- the panda checks the same bound against the shadow curvature.
-    # It only binds above ~13 m/s: below that the DBC's own 0.02 1/m cap is the tighter one, so
-    # sharp low-speed curves, the case angle control handles best, are untouched.
-    accel_limit = MAX_LATERAL_ACCEL / max(v_ego, 1.0) ** 2
-    kappa_cmd = float(clip(kappa_cmd, -accel_limit, accel_limit))
+    # The DBC's own curvature range is the only absolute bound here: BluePilot does not apply the
+    # ISO lateral acceleration ceiling in angle mode, and neither does the panda's shadow check.
+    # What bounds the actuator is path_angle's own range and rate limit further down, plus the
+    # deviation clip above.
     kappa_cmd = float(clip(kappa_cmd, -CURVATURE_MAX, CURVATURE_MAX))
 
     # *** kappa -> path_angle ***

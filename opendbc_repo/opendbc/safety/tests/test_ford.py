@@ -811,27 +811,23 @@ class TestFordAngleControlSafetyBase(FordBluePilotSafetyHarness):
       self._engage(speed, shadow=shadow)
       self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0)), f"shadow curvature {shadow} blocked")
 
-  def test_iso_lateral_accel_limit(self):
-    """Angle mode must stay inside the same cornering envelope as every other platform, even
-    though the curvature signal it would normally be checked on is pinned at zero."""
-    for speed in (15.0, 25.0, 35.0):
-      max_curvature = self._max_curvature_can(speed) / self.DEG_TO_CAN
-      for shadow, should_tx in ((max_curvature * 0.5, True), (max_curvature * 2.0, False)):
-        # keep the measurement alongside the command so the deviation band is not what bites
-        self._engage(speed, curvature=shadow, shadow=shadow)
-        self.assertEqual(should_tx, self._tx(self._lat_ctl_msg(True, 0.0)),
-                         f"{speed} m/s, shadow {shadow}, envelope {max_curvature}")
-
-  def _max_curvature_can(self, speed: float) -> int:
-    fudged_speed = max(speed - 1.0, 1.0)
-    return int(MAX_LATERAL_ACCEL / (fudged_speed * fudged_speed) * self.DEG_TO_CAN) + 1
+  def test_no_lateral_accel_ceiling(self):
+    """BluePilot does not apply the ISO lateral acceleration ceiling in angle mode, so a command
+    well past it is accepted as long as the car is actually tracking it."""
+    # speeds where the envelope sits well inside the DBC's own 0.02 1/m range, so it really is
+    # the ceiling being tested and not the signal cap
+    for speed in (25.0, 35.0):
+      fudged = max(speed - 1.0, 1.0)
+      iso_envelope = MAX_LATERAL_ACCEL / (fudged * fudged)
+      shadow = min(iso_envelope * 2.0, self.MAX_CURVATURE * 0.9)
+      self.assertGreater(shadow, iso_envelope, f"test is not exercising the ceiling at {speed} m/s")
+      self._engage(speed, curvature=shadow, shadow=shadow)
+      self.assertTrue(self._tx(self._lat_ctl_msg(True, 0.0)), f"{speed} m/s, shadow {shadow}")
 
   def test_shadow_curvature_deviation_from_measured(self):
     """The car's steering intent is checked against measured curvature even though the curvature
     signal itself is pinned at zero -- otherwise angle mode has no deviation protection at all."""
-    # above CURVATURE_ERROR_MIN_SPEED, but slow enough that the lateral accel envelope is wider
-    # than the values under test, so the deviation band is what decides
-    speed = 15.0
+    speed = 30.0
     for measured in (-0.01, 0.0, 0.01):
       for delta in (-0.006, -0.0025, 0.0, 0.0025, 0.006):
         shadow = measured + delta
@@ -990,6 +986,65 @@ class CurvatureModeMixin:
     libsafety_py.libsafety.set_current_safety_param_sp(int(PrimaryLateralControl.curvature))
     super().setUp()
     self.safety.set_current_safety_param_sp(int(PrimaryLateralControl.curvature))
+
+  # BluePilot's rate table, which replaces the ISO envelope in this mode
+  BP_ROC_BP = [5., 16., 25.]
+  BP_ROC_V = [0.0025, 0.0014, 0.00018]
+
+  def _bp_max_delta_can(self, speed: float) -> int:
+    return int(np.interp(speed - 1.0, self.BP_ROC_BP, self.BP_ROC_V) * self.DEG_TO_CAN) + 1
+
+  def test_max_lateral_acceleration(self):
+    """No acceleration ceiling in this mode: the DBC's own 0.02 1/m range is the only absolute
+    cap on c2, at every speed."""
+    max_curvature_can = round(self.MAX_CURVATURE * self.DEG_TO_CAN)
+    for speed in np.arange(0, 40, 2.0):
+      for offset in (-5, -1, 0, 1, 5):
+        curvature = (max_curvature_can + offset) / self.DEG_TO_CAN
+        for sign in (-1, 1):
+          signed = sign * curvature
+          self.safety.set_controls_allowed(True)
+          self._set_prev_desired_angle(signed)
+          self._reset_curvature_measurement(signed, speed)
+          should_tx = abs(max_curvature_can + offset) <= max_curvature_can
+          self.assertEqual(should_tx, self._tx(self._lat_ctl_msg(True, 0, 0, signed, 0)),
+                           f"{speed} m/s, {signed}")
+
+  def test_curvature_rate_limits(self):
+    """c2 is rate limited by BluePilot's table rather than the ISO lateral jerk envelope."""
+    small = 1 / self.DEG_TO_CAN
+    band = (round(self.MAX_CURVATURE_ERROR * self.DEG_TO_CAN) + 1) / self.DEG_TO_CAN
+    for speed in np.arange(2.0, 40, 2.0):
+      # from a measurement of zero, whichever of the rate limit and the deviation band is tighter
+      limit = self._bp_max_delta_can(speed) / self.DEG_TO_CAN
+      if speed > self.CURVATURE_ERROR_MIN_SPEED:
+        limit = min(limit, band)
+      for sign in (-1, 1):
+        # a couple of CAN units of slack either side, so float packing is not what is under test
+        for delta, should_tx in ((limit - 2 * small, True), (limit + 2 * small, False)):
+          self.safety.set_controls_allowed(True)
+          self._reset_curvature_measurement(0, speed)
+          self._set_prev_desired_angle(0)
+          self.assertEqual(should_tx, self._tx(self._lat_ctl_msg(True, 0, 0, sign * delta, 0)),
+                           f"{speed} m/s, step {sign * delta}")
+
+  def test_rate_limit_is_looser_than_the_iso_envelope(self):
+    """The point of the change: a step the ISO lateral jerk envelope would reject is accepted
+    where BluePilot's table is the looser of the two, which is the 11-28 m/s band."""
+    for speed in (12.0, 16.0, 20.0, 25.0):
+      fudged = max(speed - 1.0, 1.0)
+      iso_delta = MAX_LATERAL_JERK / (fudged * fudged) / self.LATERAL_FREQUENCY
+      bp_delta = self._bp_max_delta_can(speed) / self.DEG_TO_CAN
+      self.assertGreater(bp_delta, iso_delta, f"test is not exercising the change at {speed} m/s")
+
+      # a step the envelope would have rejected, still inside the deviation band
+      band = (round(self.MAX_CURVATURE_ERROR * self.DEG_TO_CAN) + 1) / self.DEG_TO_CAN
+      step = min((iso_delta + bp_delta) / 2, band - 2 / self.DEG_TO_CAN)
+      self.assertGreater(step, iso_delta, f"test is not exercising the change at {speed} m/s")
+      self.safety.set_controls_allowed(True)
+      self._reset_curvature_measurement(0, speed)
+      self._set_prev_desired_angle(0)
+      self.assertTrue(self._tx(self._lat_ctl_msg(True, 0, 0, step, 0)), f"{speed} m/s, step {step}")
 
   def test_steer_allowed(self):
     """The stock version of this asserts the three trim signals must be zero, which is exactly

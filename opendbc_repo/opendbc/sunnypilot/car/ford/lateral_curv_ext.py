@@ -18,18 +18,15 @@ polynomial coefficients at their inactive sentinels. This strategy drives all fo
 
 plus the ramp and precision toggles, which upstream pins to Slow/Precise.
 
-Two deliberate differences from BluePilot, both because sunnypilot's panda is stricter than
-theirs:
+One deliberate difference from BluePilot: a human-turn or standstill reset drops the lateral
+message to mode 0 rather than holding the mode active with zeroed signals. BluePilot needs a
+three-second blanket bypass of every safety check to make the latter work; mode 0 needs none,
+because every check in safety/modes/ford.h has a legitimate !steer_control_enabled branch. This
+is the same pattern BluePilot itself moved to for angle mode.
 
-  * The commanded curvature additionally goes through CarControllerParams.CURVATURE_LIMITS, the
-    ISO lateral acceleration and jerk envelope. BluePilot's rate table alone is looser than that
-    envelope above ~13 m/s, and their panda does not enforce it; ours does, so without this the
-    command would simply be blocked on the highway.
-  * A human-turn or standstill reset drops the lateral message to mode 0 rather than holding the
-    mode active with zeroed signals. BluePilot needs a three-second blanket bypass of every
-    safety check to make the latter work; mode 0 needs none, because every check in
-    safety/modes/ford.h has a legitimate !steer_control_enabled branch. This is the same pattern
-    BluePilot itself moved to for angle mode.
+The rate limit below is BluePilot's own table rather than openpilot's ISO lateral acceleration
+and jerk envelope, which the panda does not enforce in this mode. See FORD_BP_CURVATURE_ROC in
+safety/modes/ford.h for what does still bound the command.
 
 Background: https://bluepilot.dev/announcements/
 """
@@ -146,17 +143,14 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
                                  current_curvature + CarControllerParams.CURVATURE_ERROR))
     deviation_limited = abs(apply_curvature - pre_clip) > 1e-9
 
-  # BluePilot's three-point rate table, tighter than the ISO jerk envelope at highway speed
+  # BluePilot's three-point rate table. This is the rate limit, in place of the ISO lateral jerk
+  # envelope: the panda enforces the same table in the BluePilot modes rather than the envelope.
+  # See FORD_BP_CURVATURE_ROC in safety/modes/ford.h.
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw,
                                                  0., lat_active, BP_ANGLE_LIMITS)
 
-  # ISO lateral acceleration and jerk envelope, tighter than the table in the middle of the range.
-  # The panda enforces this on the curvature signal in every mode, so openpilot has to respect it.
-  apply_curvature = CarControllerParams.CURVATURE_LIMITS.apply_limits(
-    apply_curvature, apply_curvature_last, v_ego_raw, 0., lat_active, CarControllerParams.STEER_STEP)
-
-  # Ford Q4 / CAN FD has more torque available than Q3 / CAN, so cap it by lateral acceleration
-  # without the panda's speed fudge.
+  # Ford Q4 / CAN FD has more torque available than Q3 / CAN, so cap it by lateral acceleration.
+  # BluePilot keeps this cap on CAN FD only; CAN is bounded by the DBC's 0.02 1/m range alone.
   if CP.flags & FordFlags.CANFD:
     accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1) ** 2)
     apply_curvature = float(clip(apply_curvature, -accel_limit, accel_limit))

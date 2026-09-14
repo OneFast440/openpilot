@@ -2,6 +2,7 @@ import unittest
 
 from opendbc.car import DT_CTRL
 from opendbc.car.ford.values import CAR, CarControllerParams
+from opendbc.car.lateral import MAX_LATERAL_ACCEL
 from opendbc.sunnypilot.car.ford.human_turn import (
   HUMAN_TURN_ANGLE_DEG,
   HUMAN_TURN_HOLD_PRETURNED_S,
@@ -106,6 +107,17 @@ class TestLateralAngleExt(unittest.TestCase):
                           make_actuators(0.02))
       self.assertLessEqual(result.path_angle, FORD_DBC_PATH_ANGLE_MAX + 1e-9)
       self.assertGreaterEqual(result.path_angle, FORD_DBC_PATH_ANGLE_MIN - 1e-9)
+
+  def test_no_lateral_accel_ceiling(self):
+    """BluePilot does not apply the ISO lateral acceleration ceiling in angle mode, so the
+    steering intent can exceed it when the car is actually tracking that hard."""
+    v_ego = 30.0
+    iso_envelope = MAX_LATERAL_ACCEL / (v_ego ** 2)
+    # the car is already cornering hard, so the deviation clip is not what limits the command
+    measured = 0.01
+    self.lat.update(make_cc(), make_cc_sp(), make_cs(v_ego=v_ego, yaw_rate=-measured * v_ego),
+                    make_actuators(0.02))
+    self.assertGreater(abs(self.lat.shadow_curvature), iso_envelope)
 
   def test_deviation_clip_binds_and_is_reported(self):
     """The command is clipped to measured curvature +- CURVATURE_ERROR, the same clip the stock

@@ -193,24 +193,20 @@ static bool ford_path_angle_cmd_checks(int desired_path_angle, bool steer_contro
 // entirely. openpilot therefore publishes the curvature its path_angle was derived from
 // alongside the LKA message (see fordcan_ext.create_lka_msg), and it is checked here.
 //
-// Narrower than steer_curvature_cmd_checks in one respect: no lateral-jerk rate-of-change term.
-// shadow_curvature is not an actuator -- path_angle is, and it carries its own tuned rate limit
-// above. Imposing a second, curvature-tuned rate limit on a pure cross-check value blocks at low
-// speed for reasons unrelated to how the car is actually steering. The absolute cap, the ISO
-// lateral acceleration cap and the deviation-from-measured band all still apply, so angle mode
-// stays inside the same cornering envelope as every other platform.
+// Deliberately narrower than steer_curvature_cmd_checks: the DBC signal cap and the
+// deviation-from-measured band, with no rate-of-change term. shadow_curvature is not an actuator
+// -- path_angle is, and it carries its own tuned rate limit above. Imposing a second,
+// curvature-tuned rate limit on a pure cross-check value blocks at low speed for reasons
+// unrelated to how the car is actually steering.
+//
+// The ISO lateral acceleration ceiling is not applied here either, for the same reason it is not
+// applied to c2 in curvature mode: see FORD_BP_CURVATURE_ROC in ford_curvature_cmd_checks below.
 static bool ford_shadow_curvature_checks(int shadow_curvature, bool steer_control_enabled,
                                          const CurvatureSteeringLimits limits) {
-  static const float MAX_LATERAL_ACCEL = ISO_LATERAL_ACCEL + (EARTH_G * AVERAGE_ROAD_ROLL);  // ~3.6 m/s^2
   bool violation = false;
 
   if (steer_control_enabled) {
     violation |= safety_max_limit_check(shadow_curvature, limits.max_curvature, -limits.max_curvature);
-
-    // *** ISO lateral accel limit ***
-    const float fudged_speed = SAFETY_MAX((vehicle_speed.min / VEHICLE_SPEED_FACTOR) - 1.0, 1.0);
-    const int max_curvature_can = (MAX_LATERAL_ACCEL / (fudged_speed * fudged_speed) * limits.curvature_to_can) + 1.;
-    violation |= safety_max_limit_check(shadow_curvature, max_curvature_can, -max_curvature_can);
 
     if ((limits.max_curvature_error != 0) &&
         ((vehicle_speed.values[0] / VEHICLE_SPEED_FACTOR) > limits.curvature_error_min_speed)) {
@@ -227,6 +223,76 @@ static bool ford_shadow_curvature_checks(int shadow_curvature, bool steer_contro
 // CAN FD, so subtracting the inactive sentinel yields exactly the DBC's [-0.001024, 0.00102375]
 // and [-0.001024, 0.001023] 1/m^2 ranges. The wire format is the limit, and at the ~1.4 m
 // lookahead the PSCM actually evaluates, c3 contributes below a millimeter of lateral offset.
+// c2 checks for the BluePilot modes. Everything steer_curvature_cmd_checks does except the ISO
+// lateral acceleration and jerk envelope, which FORD_BP_CURVATURE_ROC replaces.
+static bool ford_curvature_cmd_checks(int desired_curvature, bool steer_control_enabled,
+                                      const CurvatureSteeringLimits limits) {
+  // BluePilot's own curvature rate limit, which replaces the ISO lateral acceleration and jerk
+  // envelope in both BluePilot modes. It is looser than that envelope between roughly 11 and
+  // 28 m/s and tighter outside it, and it carries no acceleration ceiling below the DBC's own
+  // 0.02 1/m cap.
+  //
+  // This is a deliberate, explicitly requested relaxation for Ford's BluePilot modes only: stock
+  // mode still goes through steer_curvature_cmd_checks and keeps the full envelope. What still
+  // bounds these modes is the DBC signal range, this rate table, the deviation-from-measured
+  // band, the real-time message rate limit and the controls_allowed gate.
+  //
+  // Mirrors BluePilot's panda: the looser of openpilot's two tables (lateral_curv_ext.py's
+  // _BP_ANGLE_RATE_DOWN) is used in both directions, so the stricter wind-up table openpilot
+  // applies always sits inside it.
+  static const struct lookup_t FORD_BP_CURVATURE_ROC = {
+    {5., 16., 25.},
+    {0.0025, 0.0014, 0.00018}
+  };
+
+  bool violation = false;
+
+  speed_mismatch_check((float)vehicle_speed_2.values[0] / VEHICLE_SPEED_FACTOR);
+
+  if ((controls_allowed || controls_allowed_lateral) && steer_control_enabled) {
+    // *** DBC signal cap ***
+    violation |= safety_max_limit_check(desired_curvature, limits.max_curvature, -limits.max_curvature);
+
+    // *** rate limit ***
+    // fudge the speed by 1 m/s so the limit is always slightly above openpilot's, in case a
+    // newer speed is read between two commands
+    const float fudged_speed = (vehicle_speed.min / VEHICLE_SPEED_FACTOR) - 1.;
+    const int delta = (safety_interpolate(FORD_BP_CURVATURE_ROC, fudged_speed) * limits.curvature_to_can) + 1.;
+    violation |= safety_max_limit_check(desired_curvature, curvature_state.desired_last + delta,
+                                        curvature_state.desired_last - delta);
+
+    // *** curvature error from measured ***
+    // openpilot clips its command to the same band, so this only fires on a genuine divergence
+    if ((limits.max_curvature_error != 0) &&
+        ((vehicle_speed.values[0] / VEHICLE_SPEED_FACTOR) > limits.curvature_error_min_speed)) {
+      const int lowest_allowed = curvature_state.meas.min - limits.max_curvature_error - 1;
+      const int highest_allowed = curvature_state.meas.max + limits.max_curvature_error + 1;
+      violation |= safety_max_limit_check(desired_curvature, highest_allowed, lowest_allowed);
+    }
+
+    // *** real time rate limit ***
+    violation |= rt_curvature_rate_limit_check(limits);
+  }
+
+  curvature_state.desired_last = desired_curvature;
+
+  // Curvature must be 0 while not steering: the signal range is not wide enough to enforce it
+  // tracking measured instead.
+  if (!steer_control_enabled) {
+    violation |= desired_curvature != 0;
+  }
+
+  violation |= !(controls_allowed || controls_allowed_lateral) && steer_control_enabled;
+
+  // re-centre the rate window on the car's actual curvature so a blocked frame can recover
+  if (violation || !(controls_allowed || controls_allowed_lateral)) {
+    curvature_state.desired_last = SAFETY_CLAMP(curvature_state.meas.values[0],
+                                                -limits.max_curvature, limits.max_curvature);
+  }
+
+  return violation;
+}
+
 static bool ford_bp_tx_checks(bool steer_control_enabled, unsigned int raw_curvature,
                               unsigned int raw_path_angle, unsigned int raw_path_offset,
                               unsigned int raw_curvature_rate, unsigned int inactive_curvature_rate) {
@@ -241,9 +307,9 @@ static bool ford_bp_tx_checks(bool steer_control_enabled, unsigned int raw_curva
 
   if (ford_lateral_mode == FORD_LAT_ANGLE) {
     // Ford adjusts its limits by speed, so it checks two speed sources against each other and
-    // drops controls when they disagree. steer_curvature_cmd_checks does this for the other two
-    // modes; angle mode does not call it, so do it here, before the controls_allowed gate below
-    // sees the result.
+    // drops controls when they disagree. The other two modes do this inside their own c2 check;
+    // angle mode has no c2 command, so do it here, before the controls_allowed gate below sees
+    // the result.
     speed_mismatch_check((float)vehicle_speed_2.values[0] / VEHICLE_SPEED_FACTOR);
 
     // c2 and c3 are held inactive; c1 is the actuator and may use the whole signal range
@@ -272,10 +338,10 @@ static bool ford_bp_tx_checks(bool steer_control_enabled, unsigned int raw_curva
     // keep the stock path's state coherent: nothing is ever commanded on c2 here
     curvature_state.desired_last = 0;
   } else {
-    // c2 is still the actuator and keeps every stock check, including the controls_allowed gate,
-    // the measured-curvature band and the real-time rate limit. c1 only trims lane position, so
-    // it is held to a far tighter cap than the signal allows.
-    violation |= steer_curvature_cmd_checks(desired_curvature, 0, steer_control_enabled, FORD_STEERING_LIMITS);
+    // c2 is still the actuator and keeps the controls_allowed gate, the measured-curvature band
+    // and the real-time rate limit; only the ISO envelope is replaced by BluePilot's rate table.
+    // c1 only trims lane position, so it is held to a far tighter cap than the signal allows.
+    violation |= ford_curvature_cmd_checks(desired_curvature, steer_control_enabled, FORD_STEERING_LIMITS);
     violation |= ford_path_angle_cmd_checks(desired_path_angle, steer_control_enabled, FORD_CURV_MODE_MAX_PATH_ANGLE);
   }
 

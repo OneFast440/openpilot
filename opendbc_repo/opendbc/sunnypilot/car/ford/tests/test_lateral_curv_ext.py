@@ -10,11 +10,16 @@ import numpy as np
 
 from opendbc.car import DT_CTRL
 from opendbc.car.ford.values import CAR, CarControllerParams
-from opendbc.car.lateral import MAX_LATERAL_ACCEL, MAX_LATERAL_JERK
+from opendbc.car.lateral import MAX_LATERAL_JERK
 from opendbc.sunnypilot.car.ford.human_turn import HUMAN_TURN_ANGLE_DEG, HUMAN_TURN_HOLD_S
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralCurvExt
 from opendbc.sunnypilot.car.ford.tests.helpers import make_actuators, make_car_params, make_cc, make_cc_sp, make_cs
-from opendbc.sunnypilot.car.ford.values_ext import CURV_MODE_PATH_ANGLE_MAX, T_IDXS, PrimaryLateralControl
+from opendbc.sunnypilot.car.ford.values_ext import (
+  CURVATURE_MAX,
+  CURV_MODE_PATH_ANGLE_MAX,
+  T_IDXS,
+  PrimaryLateralControl,
+)
 
 STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL
 LATERAL_FREQUENCY = 20  # Hz
@@ -24,13 +29,17 @@ def curv_params(platform=CAR.FORD_F_150_MK14, **tuning):
   return make_car_params(platform, mode=PrimaryLateralControl.curvature, **tuning)
 
 
-def panda_max_curvature(speed):
-  """What safety/modes/ford.h will accept, with its 1 m/s speed fudge."""
-  fudged = max(speed - 1.0, 1.0)
-  return MAX_LATERAL_ACCEL / (fudged ** 2)
+# What safety/modes/ford.h accepts in this mode, with its 1 m/s speed fudge. BluePilot's table
+# replaces the ISO lateral jerk envelope, and there is no acceleration ceiling below the DBC cap.
+PANDA_ROC_BP = [5., 16., 25.]
+PANDA_ROC_V = [0.0025, 0.0014, 0.00018]
 
 
 def panda_max_curvature_step(speed):
+  return float(np.interp(max(speed - 1.0, 1.0), PANDA_ROC_BP, PANDA_ROC_V))
+
+
+def iso_max_curvature_step(speed):
   fudged = max(speed - 1.0, 1.0)
   return MAX_LATERAL_JERK / (fudged ** 2) / LATERAL_FREQUENCY
 
@@ -81,20 +90,36 @@ class TestLateralCurvExt(unittest.TestCase):
                           make_cs(v_ego=25.0), make_actuators(0.001), 0.0)
       self.assertEqual(result.path_offset, 0.0)
 
-  def test_stays_inside_the_panda_envelope(self):
-    """BluePilot's rate table alone is looser than sunnypilot's panda above ~13 m/s. The command
-    must respect the ISO acceleration and jerk envelope too, or it is simply blocked."""
+  def test_stays_inside_what_the_panda_accepts(self):
+    """openpilot's wind-up table is the stricter of the two BluePilot ships, so the command
+    always sits inside the symmetric table the panda enforces."""
     for v_ego in (10.0, 16.0, 20.0, 25.0, 30.0, 35.0):
       lat = LateralCurvExt(self.CP, self.CP_SP)
       last = 0.0
       for _ in range(100):
         result = lat.update(make_cc(), make_cc_sp(model_curvature=0.02),
                             make_cs(v_ego=v_ego, yaw_rate=0.02 * v_ego), make_actuators(0.02), last)
-        self.assertLessEqual(abs(result.apply_curvature), panda_max_curvature(v_ego) + 1e-9,
-                             f"lateral accel envelope exceeded at {v_ego} m/s")
+        self.assertLessEqual(abs(result.apply_curvature), CURVATURE_MAX + 1e-9,
+                             f"DBC curvature range exceeded at {v_ego} m/s")
         self.assertLessEqual(abs(result.apply_curvature - last), panda_max_curvature_step(v_ego) + 1e-9,
-                             f"lateral jerk envelope exceeded at {v_ego} m/s")
+                             f"panda rate limit exceeded at {v_ego} m/s")
         last = result.apply_curvature
+
+  def test_uses_bluepilots_rate_table_not_the_iso_envelope(self):
+    """The requested behavior: through the middle of the speed range the command moves faster
+    than the ISO lateral jerk envelope would have allowed."""
+    exceeded = False
+    for v_ego in (12.0, 16.0, 20.0):
+      lat = LateralCurvExt(self.CP, self.CP_SP)
+      last = 0.0
+      for _ in range(20):
+        # measured tracks the command, so the deviation band is not what limits the ramp
+        result = lat.update(make_cc(), make_cc_sp(model_curvature=0.02),
+                            make_cs(v_ego=v_ego, yaw_rate=last * v_ego), make_actuators(0.02), last)
+        if abs(result.apply_curvature - last) > iso_max_curvature_step(v_ego) + 1e-9:
+          exceeded = True
+        last = result.apply_curvature
+    self.assertTrue(exceeded, "the command never exceeded the ISO jerk envelope it no longer respects")
 
   def test_deviation_clip_binds(self):
     self._step(v_ego=30.0, yaw_rate=0.0, curvature=0.02)
