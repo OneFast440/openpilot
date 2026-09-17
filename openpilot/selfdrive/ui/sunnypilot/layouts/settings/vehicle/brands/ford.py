@@ -55,6 +55,12 @@ DESCRIPTIONS = {
   'lane_change_factor_ang': tr_noop(
     'Scales steering authority during a lane change. Most vehicles never need this; raise it if lane changes feel too soft.'
   ),
+  'sat_observer': tr_noop(
+    'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
+    'actually turned against how much was asked of it. Without this the car keeps commanding harder into a curve the ' +
+    'module is already refusing, which is what snaps the wheel back on the way out. It does not make the steering ' +
+    'stronger. Off by default; try it on a road with real corners and watch for any hesitation mid-curve.'
+  ),
   # curvature
   'human_turn': tr_noop(
     'Hand steering back to you while you hold a real turn, instead of winding up a command the power steering ' +
@@ -136,6 +142,8 @@ class FordSettings(BrandSettings):
       tr_noop("High Speed Dampening"), "FordHighSpeedDampening_ang", "high_speed_dampening", HIGH_SPEED_DAMPENING_RANGE)
     self.lane_change_factor_ang = self._slider(
       tr_noop("Lane Change Factor"), "FordLaneChangeFactor_ang", "lane_change_factor_ang", LANE_CHANGE_FACTOR_RANGE)
+    self.sat_observer = self._toggle(
+      tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
 
     # curvature mode
     self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
@@ -168,6 +176,7 @@ class FordSettings(BrandSettings):
       self.high_speed_factor,
       self.high_speed_dampening,
       self.lane_change_factor_ang,
+      self.sat_observer,
     ]
     self.curvature_items = [
       self.human_turn,

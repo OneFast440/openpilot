@@ -401,6 +401,12 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     laneFullMode @11 :Bool;
     customProfile @12 :UInt8;           # 0 = platform defaults, 1 = the tuning values above
     lanePositioningGain @13 :Float32;   # [0.0, 20.0], default 3.0
+
+    # angle mode, PSCM-informed
+    # Observe PSCM output saturation from delivered-vs-commanded curvature instead of waiting for
+    # path_angle to approach the CAN limit. The module attenuates well before that and does not
+    # report it on CAN FD. Default off: live steering code, road-validated thresholds.
+    satObserver @14 :Bool;
   }
 
   struct FordLongitudinalTuning {

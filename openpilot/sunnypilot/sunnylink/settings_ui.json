@@ -2282,6 +2282,24 @@
           ]
         },
         {
+          "key": "FordSatObserver_ang",
+          "widget": "toggle",
+          "title": "Detect Steering Saturation (Angle)",
+          "description": "Notices when the power steering module has stopped following a larger command, by comparing how much the truck actually turned against how much was asked of it. Without this the car keeps commanding harder into a curve the module is already refusing, which is what snaps the wheel back on the way out. It does not make the steering stronger. Off by default; try it on a road with real corners and watch for any hesitation mid-curve.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "FordHumanTurnDetection_curv",
           "widget": "toggle",
           "title": "Hand Back On Manual Turns (Curvature)",
