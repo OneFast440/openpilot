@@ -2537,6 +2537,17 @@
           ]
         },
         {
+          "key": "FordBrakeLightStatus",
+          "widget": "toggle",
+          "title": "Brake Light Indicator",
+          "description": "Turn the on-road steering wheel icon red while the vehicle's brake lights are lit, whether they were lit by you, by openpilot or by the stock cruise control. Read from the vehicle rather than guessed. On this platform the only working source reports about once a second, so treat it as a rough indication rather than an instant one.",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "FordDriverMonitorCanMsg",
           "widget": "toggle",
           "title": "Driver Monitoring In Cluster",

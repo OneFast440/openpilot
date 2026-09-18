@@ -106,6 +106,11 @@ DESCRIPTIONS = {
   'hands_free_cluster': tr_noop(
     'Use the cluster\'s BlueCruise hands-free presentation while lateral control is active. CAN FD vehicles only.'
   ),
+  'brake_light_status': tr_noop(
+    'Turn the on-road steering wheel icon red while the vehicle\'s brake lights are lit, whether they were lit by you, ' +
+    'by openpilot or by the stock cruise control. Read from the vehicle rather than guessed. On this platform the only ' +
+    'working source reports about once a second, so treat it as a rough indication rather than an instant one.'
+  ),
   'driver_monitor_cluster': tr_noop(
     'Drive the cluster\'s own hands-on-wheel prompt and warnings from driver monitoring, so the escalation appears ' +
     'in the instrument cluster as well as on the device.'
@@ -170,6 +175,8 @@ class FordSettings(BrandSettings):
       tr_noop("Hands-Free Cluster Display"), "FordHandsFreeClusterMsg", "hands_free_cluster")
     self.driver_monitor_cluster = self._toggle(
       tr_noop("Driver Monitoring In Cluster"), "FordDriverMonitorCanMsg", "driver_monitor_cluster")
+    self.brake_light_status = self._toggle(
+      tr_noop("Brake Light Indicator"), "FordBrakeLightStatus", "brake_light_status")
 
     self.angle_items = [
       self.low_speed_factor,
@@ -199,6 +206,7 @@ class FordSettings(BrandSettings):
       self.downhill_compensation,
       self.hands_free_cluster,
       self.driver_monitor_cluster,
+      self.brake_light_status,
     ]
 
   @staticmethod

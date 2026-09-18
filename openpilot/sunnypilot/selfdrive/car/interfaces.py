@@ -136,6 +136,7 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "FordDownhillCompensation",
     "FordHandsFreeClusterMsg",
     "FordDriverMonitorCanMsg",
+    "FordBrakeLightStatus",
   ])
 
   # hyundai

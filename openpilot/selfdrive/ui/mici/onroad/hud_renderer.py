@@ -218,6 +218,11 @@ class HudRenderer(Widget):
                      rect.y + rect.height - 14 - (self._txt_wheel.height + icon.height) / 2)
     rl.draw_texture_ex(icon, pos, 0.0, 1.0, rl.Color(255, 255, 255, int(255 * opacity * alpha)))
 
+  def _steering_wheel_color(self) -> rl.Color:
+    """Tint of the wheel icon. Split out so a subclass can recolor it without reimplementing the
+    draw; sunnypilot uses it for the Ford brake lamp indicator."""
+    return rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
+
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else self._txt_wheel
 
@@ -252,7 +257,7 @@ class HudRenderer(Widget):
     origin = (wheel_txt.width / 2, wheel_txt.height / 2)
 
     # color and draw
-    color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
+    color = self._steering_wheel_color()
     rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
     if self._show_wheel_critical:

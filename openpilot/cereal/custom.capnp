@@ -417,6 +417,7 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   struct FordHud {
     handsFreeClusterMsg @0 :Bool;    # BlueCruise hands-free cluster UI, CAN FD only
     driverMonitorCanMsg @1 :Bool;    # drive the cluster's TJA warning from driver monitoring
+    brakeLightStatus @2 :Bool;       # publish brake lamp state for the on-road UI
   }
 }
 
@@ -512,6 +513,15 @@ struct BackupManagerSP @0xf98d843bfd7004a3 {
 
 struct CarStateSP @0xb86e6369214c01c8 {
   speedLimit @0 :Float32;
+  fordBrakeLights @1 :FordBrakeLights;
+
+  # Whether the vehicle's brake lamps are lit, so the UI can show it. Read from the bus rather
+  # than inferred: the lamps also come on for the stock ACC and for regen, neither of which
+  # openpilot can see from its own commands.
+  struct FordBrakeLights {
+    dataAvailable @0 :Bool;   # false when no source on this variant reports lamp state
+    brakeLightsOn @1 :Bool;
+  }
 }
 
 struct LiveMapDataSP @0xf416ec09499d9d19 {
