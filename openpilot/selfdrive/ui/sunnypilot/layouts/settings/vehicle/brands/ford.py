@@ -64,7 +64,9 @@ DESCRIPTIONS = {
   # curvature
   'human_turn': tr_noop(
     'Hand steering back to you while you hold a real turn, instead of winding up a command the power steering ' +
-    'module has to reconcile when you let go. Control resumes on its own.'
+    'module has to reconcile when you let go. Control resumes on its own. Turning this off keeps openpilot ' +
+    'steering through your input, which follows the plan more closely but leaves the module a larger difference ' +
+    'to reconcile when you release the wheel.'
   ),
   'lane_change_factor_curv': tr_noop(
     'Scales steering authority during a lane change. Lower is gentler.'
@@ -184,6 +186,9 @@ class FordSettings(BrandSettings):
       self.high_speed_dampening,
       self.lane_change_factor_ang,
       self.sat_observer,
+      # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
+      # controlled curvature mode; it is listed in both groups now that it means the same in both.
+      self.human_turn,
     ]
     self.curvature_items = [
       self.human_turn,

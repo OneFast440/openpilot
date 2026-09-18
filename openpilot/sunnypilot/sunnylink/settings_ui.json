@@ -2302,13 +2302,23 @@
         {
           "key": "FordHumanTurnDetection_curv",
           "widget": "toggle",
-          "title": "Hand Back On Manual Turns (Curvature)",
-          "description": "Hand steering back to you while you hold a real turn, instead of winding up a command the power steering module has to reconcile when you let go. Control resumes on its own.",
+          "title": "Hand Back On Manual Turns",
+          "description": "Hand steering back to you while you hold a real turn, instead of winding up a command the power steering module has to reconcile when you let go. Control resumes on its own. Turning this off keeps openpilot steering through your input, which follows the plan more closely but leaves the module a larger difference to reconcile when you release the wheel. Applies to both Angle and Curvature.",
           "visibility": [
             {
-              "type": "param",
-              "key": "FordPrefLateralControl",
-              "equals": 1
+              "type": "any",
+              "conditions": [
+                {
+                  "type": "param",
+                  "key": "FordPrefLateralControl",
+                  "equals": 1
+                },
+                {
+                  "type": "param",
+                  "key": "FordPrefLateralControl",
+                  "equals": 2
+                }
+              ]
             }
           ],
           "enablement": [
