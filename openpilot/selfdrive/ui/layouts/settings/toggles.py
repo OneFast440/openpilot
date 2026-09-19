@@ -22,6 +22,13 @@ DESCRIPTIONS = {
     "Your attention is required at all times to use this feature."
   ),
   "DisengageOnAccelerator": tr_noop("When enabled, pressing the accelerator pedal will disengage sunnypilot."),
+  "ThrottleOverrideHold": tr_noop(
+    "Keep commanding throttle while you are on the accelerator pedal, instead of handing longitudinal " +
+    "control back for the whole press. The car decides between your pedal and sunnypilot's request, so " +
+    "lifting off hands back to whatever sunnypilot was already asking for rather than starting from " +
+    "nothing. The brakes are never applied while you are on the pedal. Has no effect with " +
+    "\"Disengage on Accelerator Pedal\" enabled."
+  ),
   "LongitudinalPersonality": tr_noop(
     "Standard is recommended. In aggressive mode, sunnypilot will follow lead cars closer and be more aggressive with the gas and brake. " +
     "In relaxed mode sunnypilot will stay further away from lead cars. On supported cars, you can cycle through these personalities with " +
@@ -61,6 +68,12 @@ class TogglesLayout(Widget):
       "DisengageOnAccelerator": (
         lambda: tr("Disengage on Accelerator Pedal"),
         DESCRIPTIONS["DisengageOnAccelerator"],
+        "disengage_on_accelerator.png",
+        False,
+      ),
+      "ThrottleOverrideHold": (
+        lambda: tr("Hold Throttle Through Pedal Override"),
+        DESCRIPTIONS["ThrottleOverrideHold"],
         "disengage_on_accelerator.png",
         False,
       ),

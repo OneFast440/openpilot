@@ -258,6 +258,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordHandsFreeClusterMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordDriverMonitorCanMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordBrakeLightStatus", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"ThrottleOverrideHold", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"HyundaiLongitudinalTuning", {PERSISTENT | BACKUP, INT, "0"}},
     {"SubaruStopAndGo", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"SubaruStopAndGoManualParkingBrake", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -28,6 +28,17 @@ sections:
     widget: toggle
     title: Disengage Cruise on Accelerator Pedal
     description: When enabled, pressing the accelerator pedal will disengage longitudinal control.
+  - key: ThrottleOverrideHold
+    widget: toggle
+    title: Hold Throttle Through Pedal Override
+    description: Keep commanding throttle while you are on the accelerator pedal, instead of handing longitudinal control
+      back for the whole press. The car decides between your pedal and sunnypilot's request, so lifting off hands back to
+      whatever sunnypilot was already asking for rather than starting from nothing. The brakes are never applied while you
+      are on the pedal. Has no effect with "Disengage Cruise on Accelerator Pedal" enabled.
+    visibility:
+    - $ref: '#/macros/longitudinal'
+    enablement:
+    - $ref: '#/macros/longitudinal' 
   - key: LongitudinalPersonality
     widget: multiple_button
     title: Driving Personality

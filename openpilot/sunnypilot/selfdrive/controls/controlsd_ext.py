@@ -18,6 +18,8 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
+EventName = log.OnroadEvent.EventName
+
 # opendbc.sunnypilot.car.ford.values_ext.PrimaryLateralControl: 0 stock, 1 curvature, 2 angle
 FORD_PRIMARY_LATERAL_STOCK = 0
 
@@ -34,6 +36,7 @@ class ControlsExt(ModelStateBase):
     self.params = params
     self._param_update_time: float = 0.0
     self.blinker_pause_lateral = BlinkerPauseLateral()
+    self.throttle_override_hold = params.get_bool("ThrottleOverrideHold")
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -69,7 +72,27 @@ class ControlsExt(ModelStateBase):
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["lateralDelay"].lateralDelay)
 
+      self.throttle_override_hold = self.params.get_bool("ThrottleOverrideHold")
+
       self._param_update_time = time.monotonic()
+
+  def get_long_active(self, sm: messaging.SubMaster, enabled: bool) -> bool:
+    """Longitudinal engagement, with the accelerator override made optional.
+
+    Upstream hands longitudinal control back for as long as the accelerator is down: the
+    request drops out, the long control state machine goes to off and its PID resets, so
+    lifting off starts again from nothing. With the hold enabled the accelerator override no
+    longer disengages, so openpilot keeps computing and keeps sending its own request while
+    the driver is on the pedal, and the PCM arbitrates between the two. Lifting off then
+    hands back at whatever openpilot was already asking for rather than from a reset.
+
+    Every other longitudinal override still disengages exactly as before.
+    """
+    overrides = [e for e in sm['onroadEvents'] if e.overrideLongitudinal]
+    if self.throttle_override_hold:
+      overrides = [e for e in overrides if e.name != EventName.gasPressedOverride]
+    return (enabled and not overrides and
+            (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed))
 
   def get_lat_active(self, sm: messaging.SubMaster) -> bool:
     if self.blinker_pause_lateral.update(sm['carState']):

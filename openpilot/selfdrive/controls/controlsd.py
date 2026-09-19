@@ -117,8 +117,7 @@ class Controls(ControlsExt):
 
     CC.latActive = _lat_active and not CS.steerFaultTemporary and not CS.steerFaultPermanent and \
                    (not standstill or self.CP.steerAtStandstill)
-    CC.longActive = CC.enabled and not any(e.overrideLongitudinal for e in self.sm['onroadEvents']) and \
-                    (self.CP.openpilotLongitudinalControl or not self.CP_SP.pcmCruiseSpeed)
+    CC.longActive = self.get_long_active(self.sm, CC.enabled)
 
     actuators = CC.actuators
     actuators.longControlState = self.LoC.long_control_state
