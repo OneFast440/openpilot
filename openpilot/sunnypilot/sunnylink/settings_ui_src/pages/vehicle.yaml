@@ -77,6 +77,15 @@ sections:
       real corners and watch for any hesitation mid-curve.
     visibility: *id002
     enablement: *id001
+  - key: FordDeliveryCompensation_ang
+    widget: toggle
+    title: Correct Steering Shortfall (Angle)
+    description: Act on that measurement instead of only noticing it. Measured over four logs this platform turns about 0.87 of the
+      curvature it is asked for, with nothing anywhere correcting for it, so the car runs wide and you add the rest. This scales the
+      steering command by whatever cancels the shortfall it measures. It only ever adds, it is capped, and it fades out whenever you
+      touch the wheel. Needs Detect Steering Saturation on.
+    visibility: *id002
+    enablement: *id001
   - key: FordHumanTurnDetection_curv
     widget: toggle
     title: Hand Back On Manual Turns
@@ -188,6 +197,14 @@ sections:
     title: Downhill Brake Compensation
     description: Let a downhill grade count toward the braking decision. Turn this off if the car pre-charges the brakes every time
       the road tips forward.
+    enablement: *id001
+  - key: ThrottleOverrideHold
+    widget: toggle
+    title: Hold Throttle Through Pedal Override
+    description: Keep commanding throttle while you are on the accelerator pedal, instead of handing longitudinal control back for
+      the whole press. The car decides between your pedal and sunnypilot's request, so lifting off hands back to whatever sunnypilot
+      was already asking for rather than starting from nothing. The brakes are never applied while you are on the pedal. Has no
+      effect with "Disengage Cruise on Accelerator Pedal" enabled.
     enablement: *id001
   - key: FordHandsFreeClusterMsg
     widget: toggle

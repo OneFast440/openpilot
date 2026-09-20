@@ -55,6 +55,20 @@ DESCRIPTIONS = {
   'lane_change_factor_ang': tr_noop(
     'Scales steering authority during a lane change. Most vehicles never need this; raise it if lane changes feel too soft.'
   ),
+  'delivery_compensation': tr_noop(
+    'Act on that measurement instead of only noticing it. Measured over four logs this platform ' +
+    'turns about 0.87 of the curvature it is asked for, with nothing anywhere correcting for it, ' +
+    'so the car runs wide and you add the rest. This scales the steering command by whatever ' +
+    'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
+    'whenever you touch the wheel. Needs Detect Steering Saturation on.'
+  ),
+  'throttle_override_hold': tr_noop(
+    'Keep commanding throttle while you are on the accelerator pedal, instead of handing ' +
+    'longitudinal control back for the whole press. The car decides between your pedal and ' +
+    'sunnypilot\'s request, so lifting off hands back to whatever sunnypilot was already asking ' +
+    'for rather than starting from nothing. The brakes are never applied while you are on the ' +
+    'pedal. Has no effect with "Disengage on Accelerator Pedal" enabled.'
+  ),
   'sat_observer': tr_noop(
     'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
     'actually turned against how much was asked of it. Without this the car keeps commanding harder into a curve the ' +
@@ -151,6 +165,8 @@ class FordSettings(BrandSettings):
       tr_noop("Lane Change Factor"), "FordLaneChangeFactor_ang", "lane_change_factor_ang", LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = self._toggle(
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
+    self.delivery_compensation = self._toggle(
+      tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
 
     # curvature mode
     self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
@@ -179,6 +195,8 @@ class FordSettings(BrandSettings):
       tr_noop("Driver Monitoring In Cluster"), "FordDriverMonitorCanMsg", "driver_monitor_cluster")
     self.brake_light_status = self._toggle(
       tr_noop("Brake Light Indicator"), "FordBrakeLightStatus", "brake_light_status")
+    self.throttle_override_hold = self._toggle(
+      tr_noop("Hold Throttle Through Pedal Override"), "ThrottleOverrideHold", "throttle_override_hold")
 
     self.angle_items = [
       self.low_speed_factor,
@@ -186,6 +204,7 @@ class FordSettings(BrandSettings):
       self.high_speed_dampening,
       self.lane_change_factor_ang,
       self.sat_observer,
+      self.delivery_compensation,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
       # controlled curvature mode; it is listed in both groups now that it means the same in both.
       self.human_turn,
@@ -209,6 +228,7 @@ class FordSettings(BrandSettings):
       LineSeparatorSP(),
       self.follow_control,
       self.downhill_compensation,
+      self.throttle_override_hold,
       self.hands_free_cluster,
       self.driver_monitor_cluster,
       self.brake_light_status,
@@ -282,7 +302,8 @@ class FordSettings(BrandSettings):
       item.set_visible(visible)
       item.action_item.set_enabled(offroad)
 
-    for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster):
+    for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster,
+                 self.throttle_override_hold):
       item.action_item.set_enabled(offroad)
     # the cluster's hands-free presentation only exists on CAN FD vehicles
     self.hands_free_cluster.set_visible(is_canfd)

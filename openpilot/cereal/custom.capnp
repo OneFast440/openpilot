@@ -407,6 +407,11 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # path_angle to approach the CAN limit. The module attenuates well before that and does not
     # report it on CAN FD. Default off: live steering code, road-validated thresholds.
     satObserver @14 :Bool;
+    # Act on that measurement: scale the path_angle gain by the reciprocal of the measured
+    # delivered-vs-commanded ratio, so a module that honours the command at 0.87 stops leaving
+    # the car short of the curve the model asked for. Adds only, capped, and slower than the
+    # measurement it follows. Default off: this closes a loop around live steering.
+    deliveryCompensation @15 :Bool;
   }
 
   struct FordLongitudinalTuning {
