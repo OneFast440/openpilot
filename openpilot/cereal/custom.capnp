@@ -416,7 +416,11 @@ struct CarParamsSP @0x80ae746ee2596b11 {
 
   struct FordLongitudinalTuning {
     followControl @0 :Bool;          # BluePilot lead-aware following (BP's disable_BP_long_UI inverted)
-    downhillCompensation @1 :Bool;   # allow negative pitch compensation
+    downhillCompensation @1 :Bool;
+    # Accelerator pedal position, percent, above which the driver counts as overriding. Ford's
+    # CarState calls any non-zero pedal an override, which costs the driver speed the moment
+    # they feather it. See _PEDAL_OVERRIDE_RANGE in longitudinal_ext.
+    pedalOverrideThreshold @2 :Float32;   # allow negative pitch compensation
   }
 
   struct FordHud {

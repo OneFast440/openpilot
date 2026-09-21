@@ -256,6 +256,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // longitudinal and cluster
     {"FordFollowControl", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"FordDownhillCompensation", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"FordPedalOverrideThreshold", {PERSISTENT | BACKUP, FLOAT, "2.0"}},
     {"FordHandsFreeClusterMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordDriverMonitorCanMsg", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordBrakeLightStatus", {PERSISTENT | BACKUP, BOOL, "0"}},

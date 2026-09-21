@@ -29,6 +29,7 @@ from opendbc.sunnypilot.car.ford.values_ext import (
   LANE_CHANGE_FACTOR_RANGE,
   LANE_POSITIONING_GAIN_RANGE,
   LOW_SPEED_FACTOR_RANGE,
+  PEDAL_OVERRIDE_RANGE,
   PATH_OFFSET_RANGE,
   PrimaryLateralControl,
 )
@@ -76,6 +77,8 @@ class FordPanelMici:
     self.downhill_compensation = BigParamControl(tr("downhill brake compensation"), "FordDownhillCompensation")
     self.throttle_override_hold = BigParamControl(tr("hold throttle through pedal override"),
                                                   "ThrottleOverrideHold")
+    self.pedal_override_threshold = _stepper(tr("pedal override threshold"),
+                                             "FordPedalOverrideThreshold", PEDAL_OVERRIDE_RANGE)
     self.hands_free_cluster = BigParamControl(tr("hands-free cluster display"), "FordHandsFreeClusterMsg")
     self.driver_monitor_cluster = BigParamControl(tr("driver monitoring in cluster"), "FordDriverMonitorCanMsg")
     self.brake_light_status = BigParamControl(tr("brake light indicator"), "FordBrakeLightStatus")
@@ -104,6 +107,7 @@ class FordPanelMici:
       self.follow_control,
       self.downhill_compensation,
       self.throttle_override_hold,
+      self.pedal_override_threshold,
       self.hands_free_cluster,
       self.driver_monitor_cluster,
       self.brake_light_status,
