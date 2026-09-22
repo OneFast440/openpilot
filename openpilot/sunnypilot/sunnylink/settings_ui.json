@@ -2302,8 +2302,8 @@
         {
           "key": "FordDeliveryCompensation_ang",
           "widget": "toggle",
-          "title": "Correct Steering Shortfall (Angle)",
-          "description": "Act on that measurement instead of only noticing it. Measured over four logs this platform turns about 0.87 of the curvature it is asked for, with nothing anywhere correcting for it, so the car runs wide and you add the rest. This scales the steering command by whatever cancels the shortfall it measures. It only ever adds, it is capped, and it fades out whenever you touch the wheel. Needs Detect Steering Saturation on.",
+          "title": "Adaptive Steering Gain (Angle)",
+          "description": "Trims the steering gain live from how much the truck actually turns against what it was commanded, up when it falls short and down when it overshoots, so the speed factors stop being a compromise. The further off it is, the faster it corrects. It only learns in a steady curve with your hands off, stays between 0.65x and 1.5x, and drifts back to 1.0 on straights. It also pulls raised speed factors back where they would steer past the line.",
           "visibility": [
             {
               "type": "param",

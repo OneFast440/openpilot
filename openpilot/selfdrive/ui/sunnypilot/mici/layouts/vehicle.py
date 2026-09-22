@@ -60,7 +60,7 @@ class FordPanelMici:
     self.lane_change_factor_ang = _stepper(tr("lane change factor"), "FordLaneChangeFactor_ang",
                                            LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = BigParamControl(tr("detect steering saturation"), "FordSatObserver_ang")
-    self.delivery_comp = BigParamControl(tr("correct steering shortfall"), "FordDeliveryCompensation_ang")
+    self.delivery_comp = BigParamControl(tr("adaptive steering gain"), "FordDeliveryCompensation_ang")
 
     # curvature mode
     self.human_turn = BigParamControl(tr("hand back on manual turns"), "FordHumanTurnDetection_curv")

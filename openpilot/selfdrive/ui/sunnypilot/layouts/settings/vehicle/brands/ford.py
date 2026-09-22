@@ -60,11 +60,11 @@ DESCRIPTIONS = {
     'Scales steering authority during a lane change. Most vehicles never need this; raise it if lane changes feel too soft.'
   ),
   'delivery_compensation': tr_noop(
-    'Act on that measurement instead of only noticing it. Measured over four logs this platform ' +
-    'turns about 0.87 of the curvature it is asked for, with nothing anywhere correcting for it, ' +
-    'so the car runs wide and you add the rest. This scales the steering command by whatever ' +
-    'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
-    'whenever you touch the wheel. Needs Detect Steering Saturation on.'
+    'Trims the steering gain live from how much the truck actually turns against what it was ' +
+    'commanded, up when it falls short and down when it overshoots, so the speed factors stop ' +
+    'being a compromise. The further off it is, the faster it corrects. It only learns in a ' +
+    'steady curve with your hands off, stays between 0.65x and 1.5x, and drifts back to 1.0 on ' +
+    'straights. It also pulls raised speed factors back where they would steer past the line.'
   ),
   'pedal_override_threshold': tr_noop(
     'How far the accelerator has to move before sunnypilot treats it as yours. The vehicle reports ' +
@@ -196,7 +196,7 @@ class FordSettings(BrandSettings):
       tr_noop("Turn-In Rate Limit"), "FordLateralJerkLimit", "lateral_jerk_limit",
       (MAX_LATERAL_JERK, *LATERAL_JERK_LIMIT_RANGE))
     self.delivery_compensation = self._toggle(
-      tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+      tr_noop("Adaptive Steering Gain"), "FordDeliveryCompensation_ang", "delivery_compensation")
 
     # curvature mode
     self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
