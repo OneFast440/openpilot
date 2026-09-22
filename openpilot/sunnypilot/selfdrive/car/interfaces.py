@@ -136,6 +136,8 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "FordFollowControl",
     "FordDownhillCompensation",
     "FordPedalOverrideThreshold",
+    "FordLateralAccelLimit",
+    "FordLateralJerkLimit",
     "FordHandsFreeClusterMsg",
     "FordDriverMonitorCanMsg",
     "FordBrakeLightStatus",

@@ -4,7 +4,10 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+from openpilot.selfdrive.controls.lib.drive_helpers import MAX_LATERAL_ACCEL_NO_ROLL, MAX_LATERAL_JERK
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.vehicle.brands.base import BrandSettings
+from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import (LATERAL_ACCEL_LIMIT_RANGE,
+                                                                   LATERAL_JERK_LIMIT_RANGE)
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import (
@@ -77,6 +80,18 @@ DESCRIPTIONS = {
     'sunnypilot\'s request, so lifting off hands back to whatever sunnypilot was already asking ' +
     'for rather than starting from nothing. The brakes are never applied while you are on the ' +
     'pedal. Has no effect with "Disengage on Accelerator Pedal" enabled.'
+  ),
+  'lateral_accel_limit': tr_noop(
+    'The hardest cornering sunnypilot will ask for, in m/s^2. This is what decides the tightest ' +
+    'curve it can command at a given speed, and it falls with the square of speed. The default ' +
+    'allows a 6.7 m radius at 10 mph but only 42 m at 25 mph, which is why a tight turn needs ' +
+    'the speed brought down to it. The default is the ISO comfort figure. Raising it makes the ' +
+    'vehicle corner harder everywhere, not only in tight turns.'
+  ),
+  'lateral_jerk_limit': tr_noop(
+    'How quickly sunnypilot may wind into a curve, in m/s^3. Also falls with the square of ' +
+    'speed. The default is the ISO comfort figure. Above roughly 45 mph the angle-mode rate ' +
+    'limit binds first, so raising this only has an effect below that.'
   ),
   'sat_observer': tr_noop(
     'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
@@ -174,6 +189,12 @@ class FordSettings(BrandSettings):
       tr_noop("Lane Change Factor"), "FordLaneChangeFactor_ang", "lane_change_factor_ang", LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = self._toggle(
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
+    self.lateral_accel_limit = self._slider(
+      tr_noop("Cornering Limit"), "FordLateralAccelLimit", "lateral_accel_limit",
+      (MAX_LATERAL_ACCEL_NO_ROLL, *LATERAL_ACCEL_LIMIT_RANGE))
+    self.lateral_jerk_limit = self._slider(
+      tr_noop("Turn-In Rate Limit"), "FordLateralJerkLimit", "lateral_jerk_limit",
+      (MAX_LATERAL_JERK, *LATERAL_JERK_LIMIT_RANGE))
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
 
@@ -238,6 +259,8 @@ class FordSettings(BrandSettings):
       *self.angle_items,
       *self.curvature_items,
       LineSeparatorSP(),
+      self.lateral_accel_limit,
+      self.lateral_jerk_limit,
       self.follow_control,
       self.downhill_compensation,
       self.throttle_override_hold,
@@ -316,7 +339,8 @@ class FordSettings(BrandSettings):
       item.action_item.set_enabled(offroad)
 
     for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster,
-                 self.throttle_override_hold, self.pedal_override_threshold):
+                 self.throttle_override_hold, self.pedal_override_threshold,
+                 self.lateral_accel_limit, self.lateral_jerk_limit):
       item.action_item.set_enabled(offroad)
     # the cluster's hands-free presentation only exists on CAN FD vehicles
     self.hands_free_cluster.set_visible(is_canfd)
