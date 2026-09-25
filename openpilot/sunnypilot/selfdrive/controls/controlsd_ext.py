@@ -6,8 +6,6 @@ See the LICENSE.md file in the root directory for more details.
 """
 import time
 
-import numpy as np
-
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log, custom
 
@@ -15,29 +13,12 @@ from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
-from openpilot.selfdrive.controls.lib.drive_helpers import (MAX_LATERAL_ACCEL_NO_ROLL,
-                                                           MAX_LATERAL_JERK)
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 EventName = log.OnroadEvent.EventName
-
-# (min, max) for the two clip_curvature limits. The floor of each is the ISO value, so these
-# can only ever be raised, never lowered below what upstream ships.
-LATERAL_ACCEL_LIMIT_RANGE = (MAX_LATERAL_ACCEL_NO_ROLL, 5.0)
-LATERAL_JERK_LIMIT_RANGE = (MAX_LATERAL_JERK, 12.0)
-
-
-def _clamp(raw, value_range: tuple[float, float], default: float) -> float:
-  lo, hi = value_range
-  if raw is None:
-    return default
-  try:
-    return float(np.clip(float(raw), lo, hi))
-  except (TypeError, ValueError):
-    return default
 
 # opendbc.sunnypilot.car.ford.values_ext.PrimaryLateralControl: 0 stock, 1 curvature, 2 angle
 FORD_PRIMARY_LATERAL_STOCK = 0
@@ -56,9 +37,6 @@ class ControlsExt(ModelStateBase):
     self._param_update_time: float = 0.0
     self.blinker_pause_lateral = BlinkerPauseLateral()
     self.throttle_override_hold = params.get_bool("ThrottleOverrideHold")
-    self.max_lateral_accel = MAX_LATERAL_ACCEL_NO_ROLL
-    self.max_lateral_jerk = MAX_LATERAL_JERK
-    self._read_curvature_limits()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -95,32 +73,8 @@ class ControlsExt(ModelStateBase):
         self.lat_delay = get_lat_delay(self.params, sm["lateralDelay"].lateralDelay)
 
       self.throttle_override_hold = self.params.get_bool("ThrottleOverrideHold")
-      self._read_curvature_limits()
 
       self._param_update_time = time.monotonic()
-
-  def _read_curvature_limits(self) -> None:
-    """How hard and how quickly openpilot is willing to turn, per platform.
-
-    clip_curvature's two ISO limits scale as 1/v^2, so between them they set the tightest
-    curve openpilot will ask for at a given speed and how fast it may wind into it. On Ford
-    they are the binding constraint: measured over an engaged drive the steering rack tracks
-    the model with no measurable lag and 0.93 gain, its own LatCtlLim reads LimitNotReached on
-    98.5% of frames, and openpilot's own rate cap is the only thing that binds at all. At 25
-    mph the accel limit alone caps the command at a 42 m radius, against the 6.7 m the same
-    limit allows at 10 mph, which is why a tight turn needs the speed brought down to it.
-
-    Defaults are the ISO values, so this changes nothing until a platform asks for more.
-    """
-    if self.CP.brand != 'ford':
-      return
-    self.max_lateral_accel = _clamp(self.params.get("FordLateralAccelLimit"),
-                                    LATERAL_ACCEL_LIMIT_RANGE, MAX_LATERAL_ACCEL_NO_ROLL)
-    self.max_lateral_jerk = _clamp(self.params.get("FordLateralJerkLimit"),
-                                   LATERAL_JERK_LIMIT_RANGE, MAX_LATERAL_JERK)
-
-  def curvature_limits(self) -> tuple[float, float]:
-    return self.max_lateral_accel, self.max_lateral_jerk
 
   def get_long_active(self, sm: messaging.SubMaster, enabled: bool) -> bool:
     """Longitudinal engagement, with the accelerator override made optional.

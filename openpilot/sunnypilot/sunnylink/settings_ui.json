@@ -2302,8 +2302,8 @@
         {
           "key": "FordDeliveryCompensation_ang",
           "widget": "toggle",
-          "title": "Adaptive Steering Gain (Angle)",
-          "description": "Trims the steering gain live from how much the truck actually turns against what it was commanded, up when it falls short and down when it overshoots, so the speed factors stop being a compromise. The further off it is, the faster it corrects. It only learns in a steady curve with your hands off, stays between 0.65x and 1.5x, and drifts back to 1.0 on straights. It also pulls raised speed factors back where they would steer past the line.",
+          "title": "Correct Steering Shortfall (Angle)",
+          "description": "Act on that measurement instead of only noticing it. Measured over four logs this platform turns about 0.87 of the curvature it is asked for, with nothing anywhere correcting for it, so the car runs wide and you add the rest. This scales the steering command by whatever cancels the shortfall it measures. It only ever adds, it is capped, and it fades out whenever you touch the wheel. Needs Detect Steering Saturation on.",
           "visibility": [
             {
               "type": "param",
@@ -2556,36 +2556,6 @@
               "type": "offroad_only"
             }
           ]
-        },
-        {
-          "key": "FordLateralAccelLimit",
-          "widget": "option_control",
-          "title": "Cornering Limit",
-          "description": "The hardest cornering sunnypilot will ask for, in m/s^2. This is what decides the tightest curve it can command at a given speed, and it falls with the square of speed. The default allows a 6.7 m radius at 10 mph but only 42 m at 25 mph, which is why a tight turn needs the speed brought down to it. The default is the ISO comfort figure. Raising it makes the vehicle corner harder everywhere, not only in tight turns.",
-          "min": 3.0,
-          "max": 5.0,
-          "step": 0.1,
-          "enablement": [
-            {
-              "type": "offroad_only"
-            }
-          ],
-          "default": 3.0
-        },
-        {
-          "key": "FordLateralJerkLimit",
-          "widget": "option_control",
-          "title": "Turn-In Rate Limit",
-          "description": "How quickly sunnypilot may wind into a curve, in m/s^3. Also falls with the square of speed. The default is the ISO comfort figure. Above roughly 45 mph the angle-mode rate limit binds first, so raising this only has an effect below that.",
-          "min": 5.0,
-          "max": 12.0,
-          "step": 0.5,
-          "enablement": [
-            {
-              "type": "offroad_only"
-            }
-          ],
-          "default": 5.0
         },
         {
           "key": "FordPedalOverrideThreshold",

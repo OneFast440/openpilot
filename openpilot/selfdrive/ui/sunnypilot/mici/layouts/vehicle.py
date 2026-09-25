@@ -13,10 +13,7 @@ the device at all and could only be set through sunnylink. This is that panel.
 Same params, same storage, same visibility rules as the large-screen Ford page, rendered with
 mici's own widgets.
 """
-from openpilot.selfdrive.controls.lib.drive_helpers import MAX_LATERAL_ACCEL_NO_ROLL, MAX_LATERAL_JERK
 from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl, BigMultiParamToggle, GreyBigButton
-from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import (LATERAL_ACCEL_LIMIT_RANGE,
-                                                                   LATERAL_JERK_LIMIT_RANGE)
 from openpilot.selfdrive.ui.sunnypilot.mici.widgets.stepper import BigParamStepper
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr
@@ -60,7 +57,7 @@ class FordPanelMici:
     self.lane_change_factor_ang = _stepper(tr("lane change factor"), "FordLaneChangeFactor_ang",
                                            LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = BigParamControl(tr("detect steering saturation"), "FordSatObserver_ang")
-    self.delivery_comp = BigParamControl(tr("adaptive steering gain"), "FordDeliveryCompensation_ang")
+    self.delivery_comp = BigParamControl(tr("correct steering shortfall"), "FordDeliveryCompensation_ang")
 
     # curvature mode
     self.human_turn = BigParamControl(tr("hand back on manual turns"), "FordHumanTurnDetection_curv")
@@ -82,10 +79,6 @@ class FordPanelMici:
                                                   "ThrottleOverrideHold")
     self.pedal_override_threshold = _stepper(tr("pedal override threshold"),
                                              "FordPedalOverrideThreshold", PEDAL_OVERRIDE_RANGE)
-    self.lateral_accel_limit = _stepper(tr("cornering limit"), "FordLateralAccelLimit",
-                                        (MAX_LATERAL_ACCEL_NO_ROLL, *LATERAL_ACCEL_LIMIT_RANGE))
-    self.lateral_jerk_limit = _stepper(tr("turn-in rate limit"), "FordLateralJerkLimit",
-                                       (MAX_LATERAL_JERK, *LATERAL_JERK_LIMIT_RANGE))
     self.hands_free_cluster = BigParamControl(tr("hands-free cluster display"), "FordHandsFreeClusterMsg")
     self.driver_monitor_cluster = BigParamControl(tr("driver monitoring in cluster"), "FordDriverMonitorCanMsg")
     self.brake_light_status = BigParamControl(tr("brake light indicator"), "FordBrakeLightStatus")
@@ -115,8 +108,6 @@ class FordPanelMici:
       self.downhill_compensation,
       self.throttle_override_hold,
       self.pedal_override_threshold,
-      self.lateral_accel_limit,
-      self.lateral_jerk_limit,
       self.hands_free_cluster,
       self.driver_monitor_cluster,
       self.brake_light_status,

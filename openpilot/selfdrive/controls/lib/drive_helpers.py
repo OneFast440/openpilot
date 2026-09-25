@@ -25,25 +25,17 @@ def smooth_value(val, prev_val, tau, dt=DT_MDL):
   alpha = 1 - np.exp(-dt/tau) if tau > 0 else 1
   return alpha * val + (1 - alpha) * prev_val
 
-def clip_curvature(v_ego, prev_curvature, new_curvature, roll,
-                   max_lateral_accel=MAX_LATERAL_ACCEL_NO_ROLL,
-                   max_lateral_jerk=MAX_LATERAL_JERK) -> tuple[float, bool]:
+def clip_curvature(v_ego, prev_curvature, new_curvature, roll) -> tuple[float, bool]:
   # This function respects ISO lateral jerk and acceleration limits + a max curvature
-  #
-  # sunnypilot: both limits are overridable per platform, defaulting to the ISO values so
-  # nothing changes unless a car asks. They scale as 1/v^2, so they are what decides how tight
-  # and how quickly openpilot will turn at any given speed, and on a platform whose steering
-  # rack tracks the command with no measurable lag they are the binding constraint rather than
-  # anything in the car. They are comfort limits, not a safety ceiling.
   v_ego = max(v_ego, MIN_SPEED)
-  max_curvature_rate = max_lateral_jerk / (v_ego ** 2)  # inexact calculation, check https://github.com/commaai/openpilot/pull/24755
+  max_curvature_rate = MAX_LATERAL_JERK / (v_ego ** 2)  # inexact calculation, check https://github.com/commaai/openpilot/pull/24755
   new_curvature = np.clip(new_curvature,
                           prev_curvature - max_curvature_rate * DT_CTRL,
                           prev_curvature + max_curvature_rate * DT_CTRL)
 
   roll_compensation = roll * ACCELERATION_DUE_TO_GRAVITY
-  max_lat_accel = max_lateral_accel + roll_compensation
-  min_lat_accel = -max_lateral_accel + roll_compensation
+  max_lat_accel = MAX_LATERAL_ACCEL_NO_ROLL + roll_compensation
+  min_lat_accel = -MAX_LATERAL_ACCEL_NO_ROLL + roll_compensation
   new_curvature, limited_accel = clamp(new_curvature, min_lat_accel / v_ego ** 2, max_lat_accel / v_ego ** 2)
 
   new_curvature, limited_max_curv = clamp(new_curvature, -MAX_CURVATURE, MAX_CURVATURE)
