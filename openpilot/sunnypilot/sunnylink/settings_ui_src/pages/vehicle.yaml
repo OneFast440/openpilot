@@ -86,6 +86,19 @@ sections:
       touch the wheel. Needs Detect Steering Saturation on.
     visibility: *id002
     enablement: *id001
+  - key: FordPathOffsetLimit_ang
+    widget: option
+    title: Low-Speed Turn Assist (C0) (Angle)
+    description: Adds the path offset signal (C0) alongside angle mode's path angle, to build tight turns faster below about 30 mph. The steering
+      module follows the path angle slowly, so a tight turn can take seconds to build, and C0 is a second input it follows much
+      faster. This sets how much of it, in metres. 0 is off. It fades out by 31 mph and never exceeds 1.0 m. How strongly C0 steers
+      this truck is inferred from its logs, not measured, so start at 0.3 and raise it only if tight turns still lag, watching for the
+      truck turning in too far.
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    visibility: *id002
+    enablement: *id001
   - key: FordHumanTurnDetection_curv
     widget: toggle
     title: Hand Back On Manual Turns

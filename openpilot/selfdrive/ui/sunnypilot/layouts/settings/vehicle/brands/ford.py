@@ -16,6 +16,7 @@ from openpilot.system.ui.sunnypilot.widgets.list_view import (
 
 from opendbc.car.ford.values import FordFlags
 from opendbc.sunnypilot.car.ford.values_ext import (
+  ANGLE_PATH_OFFSET_LIMIT_RANGE,
   BLEND_RATIO_RANGE,
   HIGH_SPEED_DAMPENING_RANGE,
   HIGH_SPEED_FACTOR_RANGE,
@@ -61,6 +62,14 @@ DESCRIPTIONS = {
     'so the car runs wide and you add the rest. This scales the steering command by whatever ' +
     'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
     'whenever you touch the wheel. Needs Detect Steering Saturation on.'
+  ),
+  'path_offset_limit': tr_noop(
+    'Adds the path offset signal (C0) alongside angle mode\'s path angle, to build tight turns ' +
+    'faster below about 30 mph. The steering module follows the path angle slowly, so a tight ' +
+    'turn can take seconds to build, and C0 is a second input it follows much faster. This sets ' +
+    'how much of it, in metres. 0 is off. It fades out by 31 mph and never exceeds 1.0 m. How ' +
+    'strongly C0 steers this truck is inferred from its logs, not measured, so start at 0.3 and ' +
+    'raise it only if tight turns still lag, watching for the truck turning in too far.'
   ),
   'sat_observer': tr_noop(
     'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
@@ -160,6 +169,9 @@ class FordSettings(BrandSettings):
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+    self.path_offset_limit = self._slider(
+      tr_noop("Low-Speed Turn Assist (C0)"), "FordPathOffsetLimit_ang", "path_offset_limit",
+      ANGLE_PATH_OFFSET_LIMIT_RANGE)
 
     # curvature mode
     self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
@@ -196,6 +208,7 @@ class FordSettings(BrandSettings):
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_compensation,
+      self.path_offset_limit,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
       # controlled curvature mode; it is listed in both groups now that it means the same in both.
       self.human_turn,

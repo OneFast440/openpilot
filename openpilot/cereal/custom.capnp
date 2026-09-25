@@ -412,6 +412,9 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # the car short of the curve the model asked for. Adds only, capped, and slower than the
     # measurement it follows. Default off: this closes a loop around live steering.
     deliveryCompensation @15 :Bool;
+    # Angle mode's c0 (path offset) limit in metres, 0 = off. c0 carries part of a tight low-speed
+    # turn alongside c1, which the PSCM follows far more slowly; faded out by 14 m/s.
+    pathOffsetLimit @16 :Float32;
   }
 
   struct FordLongitudinalTuning {

@@ -243,6 +243,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordLaneChangeFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordSatObserver_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordDeliveryCompensation_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"FordPathOffsetLimit_ang", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     // curvature mode
     {"FordHumanTurnDetection_curv", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"FordLaneChangeFactor_curv", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
