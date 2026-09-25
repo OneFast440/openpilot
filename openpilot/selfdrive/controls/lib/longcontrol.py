@@ -73,16 +73,8 @@ class LongControl:
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
-      # sunnypilot: while the driver is on the accelerator, aEgo is their pedal and a_target is
-      # ours, so the error measures the two against each other rather than our own tracking, and
-      # integrating it only winds up. ki is 0.5, which is 0.75 m/s^2 of integral per second of
-      # override, so a few seconds of it pins the integrator at the negative accel limit and the
-      # whole thing lands as a brake application the moment they lift off. Upstream never meets
-      # this because the accelerator drops longActive and this branch stops running; it only
-      # comes up with ThrottleOverrideHold, which keeps the loop alive through the press.
       output_accel = self.pid.update(error, speed=CS.vEgo,
-                                     feedforward=a_target,
-                                     freeze_integrator=CS.gasPressed)
+                                     feedforward=a_target)
 
     self.last_output_accel = np.clip(output_accel, accel_limits[0], accel_limits[1])
     return self.last_output_accel

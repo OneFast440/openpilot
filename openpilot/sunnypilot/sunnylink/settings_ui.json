@@ -2547,32 +2547,6 @@
           ]
         },
         {
-          "key": "ThrottleOverrideHold",
-          "widget": "toggle",
-          "title": "Hold Throttle Through Pedal Override",
-          "description": "Keep commanding throttle while you are on the accelerator pedal, instead of handing longitudinal control back for the whole press. The car decides between your pedal and sunnypilot's request, so lifting off hands back to whatever sunnypilot was already asking for rather than starting from nothing. The brakes are never applied while you are on the pedal. Has no effect with \"Disengage Cruise on Accelerator Pedal\" enabled.",
-          "enablement": [
-            {
-              "type": "offroad_only"
-            }
-          ]
-        },
-        {
-          "key": "FordPedalOverrideThreshold",
-          "widget": "option_control",
-          "title": "Pedal Override Threshold",
-          "description": "How far the accelerator has to move before sunnypilot treats it as yours. The vehicle reports any pedal movement at all as a press, so without this the lightest touch hands longitudinal control back and the truck slows under a pedal you have just rested on. A deliberate press measures well above the default. Raising it keeps sunnypilot commanding through a light press, which has not been proven safe on this platform; raise it a little at a time and watch for a cruise fault.",
-          "min": 0.0,
-          "max": 25.0,
-          "step": 0.5,
-          "enablement": [
-            {
-              "type": "offroad_only"
-            }
-          ],
-          "default": 2.0
-        },
-        {
           "key": "FordHandsFreeClusterMsg",
           "widget": "toggle",
           "title": "Hands-Free Cluster Display",

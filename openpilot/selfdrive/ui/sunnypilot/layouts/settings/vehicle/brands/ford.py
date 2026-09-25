@@ -23,7 +23,6 @@ from opendbc.sunnypilot.car.ford.values_ext import (
   LANE_CHANGE_FACTOR_RANGE,
   LANE_POSITIONING_GAIN_RANGE,
   LOW_SPEED_FACTOR_RANGE,
-  PEDAL_OVERRIDE_RANGE,
   PATH_OFFSET_RANGE,
   PrimaryLateralControl,
 )
@@ -62,21 +61,6 @@ DESCRIPTIONS = {
     'so the car runs wide and you add the rest. This scales the steering command by whatever ' +
     'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
     'whenever you touch the wheel. Needs Detect Steering Saturation on.'
-  ),
-  'pedal_override_threshold': tr_noop(
-    'How far the accelerator has to move before sunnypilot treats it as yours. The vehicle reports ' +
-    'any pedal movement at all as a press, so without this the lightest touch hands longitudinal ' +
-    'control back and the truck slows under a pedal you have just rested on. A deliberate press ' +
-    'measures well above the default. Raising it keeps sunnypilot commanding through a light press, ' +
-    'which has not been proven safe on this platform; raise it a little at a time and watch for a ' +
-    'cruise fault.'
-  ),
-  'throttle_override_hold': tr_noop(
-    'Keep commanding throttle while you are on the accelerator pedal, instead of handing ' +
-    'longitudinal control back for the whole press. The car decides between your pedal and ' +
-    'sunnypilot\'s request, so lifting off hands back to whatever sunnypilot was already asking ' +
-    'for rather than starting from nothing. The brakes are never applied while you are on the ' +
-    'pedal. Has no effect with "Disengage on Accelerator Pedal" enabled.'
   ),
   'sat_observer': tr_noop(
     'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
@@ -204,11 +188,6 @@ class FordSettings(BrandSettings):
       tr_noop("Driver Monitoring In Cluster"), "FordDriverMonitorCanMsg", "driver_monitor_cluster")
     self.brake_light_status = self._toggle(
       tr_noop("Brake Light Indicator"), "FordBrakeLightStatus", "brake_light_status")
-    self.throttle_override_hold = self._toggle(
-      tr_noop("Hold Throttle Through Pedal Override"), "ThrottleOverrideHold", "throttle_override_hold")
-    self.pedal_override_threshold = self._slider(
-      tr_noop("Pedal Override Threshold"), "FordPedalOverrideThreshold", "pedal_override_threshold",
-      PEDAL_OVERRIDE_RANGE)
 
     self.angle_items = [
       self.low_speed_factor,
@@ -240,8 +219,6 @@ class FordSettings(BrandSettings):
       LineSeparatorSP(),
       self.follow_control,
       self.downhill_compensation,
-      self.throttle_override_hold,
-      self.pedal_override_threshold,
       self.hands_free_cluster,
       self.driver_monitor_cluster,
       self.brake_light_status,
@@ -315,8 +292,7 @@ class FordSettings(BrandSettings):
       item.set_visible(visible)
       item.action_item.set_enabled(offroad)
 
-    for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster,
-                 self.throttle_override_hold, self.pedal_override_threshold):
+    for item in (self.follow_control, self.downhill_compensation, self.driver_monitor_cluster):
       item.action_item.set_enabled(offroad)
     # the cluster's hands-free presentation only exists on CAN FD vehicles
     self.hands_free_cluster.set_visible(is_canfd)
