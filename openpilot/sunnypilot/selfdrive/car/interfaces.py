@@ -124,7 +124,6 @@ def initialize_params(params) -> list[dict[str, Any]]:
     "FordLaneChangeFactor_ang",
     "FordSatObserver_ang",
     "FordDeliveryCompensation_ang",
-    "FordPathOffsetLimit_ang",
     "FordHumanTurnDetection_curv",
     "FordLaneChangeFactor_curv",
     "FordCustomProfile_curv",

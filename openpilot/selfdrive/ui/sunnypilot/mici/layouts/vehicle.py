@@ -22,7 +22,6 @@ from openpilot.system.ui.widgets.scroller import NavScroller
 
 from opendbc.car.ford.values import FordFlags
 from opendbc.sunnypilot.car.ford.values_ext import (
-  ANGLE_PATH_OFFSET_LIMIT_RANGE,
   BLEND_RATIO_RANGE,
   HIGH_SPEED_DAMPENING_RANGE,
   HIGH_SPEED_FACTOR_RANGE,
@@ -58,8 +57,6 @@ class FordPanelMici:
                                            LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = BigParamControl(tr("detect steering saturation"), "FordSatObserver_ang")
     self.delivery_comp = BigParamControl(tr("correct steering shortfall"), "FordDeliveryCompensation_ang")
-    self.path_offset_limit = _stepper(tr("low-speed turn assist (c0)"), "FordPathOffsetLimit_ang",
-                                      ANGLE_PATH_OFFSET_LIMIT_RANGE)
 
     # curvature mode
     self.human_turn = BigParamControl(tr("hand back on manual turns"), "FordHumanTurnDetection_curv")
@@ -88,7 +85,6 @@ class FordPanelMici:
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_comp,
-      self.path_offset_limit,
       self.human_turn,
     ]
     self.curvature_items = [
