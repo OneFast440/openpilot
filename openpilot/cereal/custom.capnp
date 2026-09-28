@@ -412,6 +412,10 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # the car short of the curve the model asked for. Adds only, capped, and slower than the
     # measurement it follows. Default off: this closes a loop around live steering.
     deliveryCompensation @15 :Bool;
+    pathOffsetLimitDEPRECATED @16 :Float32;   # c0 experiment, removed; kept so its logs still read
+    # Closed-course A/B: request LatCtl_D2_Rq = 2 (PathFollowingExtendedMode) instead of 1 in angle
+    # mode. From FordLatCtlExtendedTest, which clears itself when the car goes offroad.
+    extendedModeTest @17 :Bool;
   }
 
   struct FordLongitudinalTuning {

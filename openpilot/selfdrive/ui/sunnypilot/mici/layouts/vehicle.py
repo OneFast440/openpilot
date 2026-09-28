@@ -57,6 +57,7 @@ class FordPanelMici:
                                            LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = BigParamControl(tr("detect steering saturation"), "FordSatObserver_ang")
     self.delivery_comp = BigParamControl(tr("correct steering shortfall"), "FordDeliveryCompensation_ang")
+    self.extended_mode_test = BigParamControl(tr("extended mode test (one drive)"), "FordLatCtlExtendedTest")
 
     # curvature mode
     self.human_turn = BigParamControl(tr("hand back on manual turns"), "FordHumanTurnDetection_curv")
@@ -85,6 +86,7 @@ class FordPanelMici:
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_comp,
+      self.extended_mode_test,
       self.human_turn,
     ]
     self.curvature_items = [

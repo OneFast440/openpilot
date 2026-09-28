@@ -100,15 +100,52 @@ MANEUVERS = [
 ]
 
 
+def _hold(accel: float, ramp_s: float = 0.5, hold_s: float = 4.0) -> Action:
+  """Ramp to a lateral acceleration, hold it, ramp back out. The hold is long enough for a slow
+  actuator to settle, so its steady part measures delivery rather than lag."""
+  return Action([0.0, accel, accel, 0.0], [0.0, ramp_s, ramp_s + hold_s, 2 * ramp_s + hold_s])
+
+
+def _sweep(peak: float, rise_s: float = 6.0) -> Action:
+  """A slow ramp to peak and a quick return: maps where an actuator starts reporting its limit
+  against a command that is never a step."""
+  return Action([0.0, peak, 0.0], [0.0, rise_s, rise_s + 1.0])
+
+
+# Ford PSCM characterization (see FORD_PSCM.md). Aimed at the low-speed wall: the PSCM follows the
+# LateralMotionControl2 path angle slowly, and tight low-speed turns are where that shows. Each
+# level stays inside the 0.52 rad path-angle signal at its speed with the default gain schedule:
+# kappa = accel / v^2 and path_angle ~ kappa * v * 1.3, so 12 mph tops out at 1.5 m/s^2.
+def _ford_holds(mph: int, accels: tuple[float, ...]) -> list[Maneuver]:
+  return [Maneuver(f"hold {sign * accel:+.1f}m/s^2 {mph}mph", [_hold(sign * accel), Action([0.0], [1.5])],
+                   repeat=1, initial_speed=mph * CV.MPH_TO_MS)
+          for accel in accels for sign in (1.0, -1.0)]
+
+
+# Fastest first: the suite waits at each speed until it is held, so if the truck's cruise cannot
+# hold 12 mph, everything else has already run by the time it stalls there.
+FORD_PSCM_MANEUVERS = (
+  _ford_holds(20, (1.0, 2.0, 2.5)) +
+  _ford_holds(16, (1.0, 2.0)) +
+  [Maneuver(f"sweep {sign * 2.5:+.1f}m/s^2 16mph", [_sweep(sign * 2.5), Action([0.0], [1.5])],
+            repeat=1, initial_speed=16. * CV.MPH_TO_MS) for sign in (1.0, -1.0)] +
+  _ford_holds(12, (1.0, 1.5))
+)
+
+
+def maneuvers_for(CP) -> list[Maneuver]:
+  return FORD_PSCM_MANEUVERS if CP.brand == "ford" else MANEUVERS
+
+
 def main():
   params = Params()
   cloudlog.info("lateral_maneuversd is waiting for CarParams")
-  messaging.log_from_bytes(params.get("CarParams", block=True), car.CarParams)
+  CP = messaging.log_from_bytes(params.get("CarParams", block=True), car.CarParams)
 
   sm = messaging.SubMaster(['carState', 'carControl', 'controlsState', 'selfdriveState', 'modelV2'], poll='modelV2')
   pm = messaging.PubMaster(['lateralManeuverPlan', 'alertDebug'])
 
-  maneuvers = iter(MANEUVERS)
+  maneuvers = iter(maneuvers_for(CP))
   maneuver = None
   complete_cnt = 0
   aborted_cnt = 0

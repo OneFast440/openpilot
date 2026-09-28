@@ -62,6 +62,13 @@ DESCRIPTIONS = {
     'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
     'whenever you touch the wheel. Needs Detect Steering Saturation on.'
   ),
+  'extended_mode_test': tr_noop(
+    'Closed-course test only. Asks the power steering module for its Extended path-following ' +
+    'mode instead of the Limited mode openpilot always uses. It switches itself off when the ' +
+    'truck is turned off, so it lasts one drive. What Extended changes on this truck is ' +
+    'unknown; follow tools/lateral_maneuvers/FORD_PSCM.md and stop if the module reports Denied ' +
+    'or Faulty.'
+  ),
   'sat_observer': tr_noop(
     'Notices when the power steering module has stopped following a larger command, by comparing how much the truck ' +
     'actually turned against how much was asked of it. Without this the car keeps commanding harder into a curve the ' +
@@ -160,6 +167,8 @@ class FordSettings(BrandSettings):
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+    self.extended_mode_test = self._toggle(
+      tr_noop("Extended Mode Test (One Drive)"), "FordLatCtlExtendedTest", "extended_mode_test")
 
     # curvature mode
     self.human_turn = self._toggle(tr_noop("Hand Back On Manual Turns"), "FordHumanTurnDetection_curv", "human_turn")
@@ -196,6 +205,7 @@ class FordSettings(BrandSettings):
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_compensation,
+      self.extended_mode_test,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
       # controlled curvature mode; it is listed in both groups now that it means the same in both.
       self.human_turn,

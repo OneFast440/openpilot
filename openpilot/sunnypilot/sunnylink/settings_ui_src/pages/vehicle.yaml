@@ -86,6 +86,14 @@ sections:
       touch the wheel. Needs Detect Steering Saturation on.
     visibility: *id002
     enablement: *id001
+  - key: FordLatCtlExtendedTest
+    widget: toggle
+    title: Extended Mode Test, One Drive (Angle)
+    description: Closed-course test only. Asks the power steering module for its Extended path-following mode instead of the Limited mode
+      openpilot always uses. It switches itself off when the truck is turned off, so it lasts one drive. What Extended changes on this
+      truck is unknown; follow tools/lateral_maneuvers/FORD_PSCM.md and stop if the module reports Denied or Faulty.
+    visibility: *id002
+    enablement: *id001
   - key: FordHumanTurnDetection_curv
     widget: toggle
     title: Hand Back On Manual Turns
