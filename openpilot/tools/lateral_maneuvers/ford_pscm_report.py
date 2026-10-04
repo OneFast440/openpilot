@@ -39,6 +39,9 @@ PT_BUS = 0
 LOW_SPEED_FACTOR_MAX_V = 13.5            # m/s
 STEADY_MIN_S = 2.5                       # a hold must be flat this long to count
 STEADY_TAIL_S = 2.0                      # and only its last part is measured
+SETTLED_DRIFT = 0.05                     # a hold has settled when the truck moves less than this much of
+                                         # the request across the measured part
+EDGE_S = 0.3                             # panda blocks this close to engage/disengage are the usual race
 STRAIGHT_KAPPA = 2e-4                    # 1/m, what counts as straight for the yaw-bias estimate
 ANGLE_BUCKETS_DEG = list(range(11)) + [15, 20, 30]
 # Limit onset is speed dependent: on logged drives the PSCM reported LimitClose from 3-4 deg of
@@ -70,7 +73,7 @@ class Frames:
   cols: dict[str, np.ndarray] = field(default_factory=dict)
   tuning: object = None
   labels: list[str] = field(default_factory=list)
-  blocked_delta: int = 0
+  panda: list[tuple[float, str, int, bool]] = field(default_factory=list)   # (t, safety mode, tx blocked, allowed)
   files: int = 0
 
   def __len__(self):
@@ -88,7 +91,6 @@ def load(sources: list[str]) -> Frames:
   f = Frames()
   latest = {"cs": None, "cc": None, "plan_valid": False, "plan_kappa": 0.0, "label": "",
             "status": None, "current": math.nan}
-  blocked = []
   for src in sources:
     f.files += 1
     t0 = None
@@ -108,7 +110,9 @@ def load(sources: list[str]) -> Frames:
       elif w == "carParamsSP" and f.tuning is None:
         f.tuning = m.carParamsSP.fordLateralTuning
       elif w == "pandaStates" and len(m.pandaStates):
-        blocked.append(m.pandaStates[0].safetyTxBlocked)
+        p = m.pandaStates[0]
+        f.panda.append(((m.logMonoTime - t0) * 1e-9 + 1e4 * (f.files - 1), str(p.safetyModel),
+                        int(p.safetyTxBlocked), bool(p.controlsAllowed)))
       elif w == "can":
         for c in m.can:
           if c.src != PT_BUS:
@@ -144,8 +148,6 @@ def load(sources: list[str]) -> Frames:
           rows["current"].append(latest["current"])
           f.labels.append(latest["label"] if latest["plan_valid"] else "")
   f.cols = {k: np.asarray(v, dtype=float) for k, v in rows.items()}
-  if blocked:
-    f.blocked_delta = int(max(blocked) - blocked[0])
   if len(f):
     f.cols["kappa"] = measured_curvature(f)
   return f
@@ -158,6 +160,19 @@ def measured_curvature(f: Frames) -> np.ndarray:
   straight = (c["lat_active"] > 0) & (np.abs(c["request"]) < STRAIGHT_KAPPA) & (c["v"] > 5) & (c["pressed"] == 0)
   f.yaw_bias = float(np.median(c["yaw"][straight])) if straight.sum() > 100 else 0.0
   return -(c["yaw"] - f.yaw_bias) / np.maximum(c["v"], 0.5)
+
+
+def panda_blocks(f: Frames) -> list[tuple[float, int, bool]]:
+  """(t, messages blocked, within EDGE_S of controls allowed changing). The counter restarts when
+  the safety mode changes, and blocks before the Ford mode is set (startup) are not ours, so only
+  increments under the Ford mode count. A few blocks right at engage or disengage are the usual
+  race between the panda seeing the pedal and openpilot's next frame."""
+  edges = [b[0] for a, b in zip(f.panda, f.panda[1:], strict=False) if a[3] != b[3]]
+  out = []
+  for a, b in zip(f.panda, f.panda[1:], strict=False):
+    if a[1] == b[1] == "ford" and b[2] > a[2] and b[0] - a[0] < 1.0:   # not across two logs
+      out.append((b[0], b[2] - a[2], any(abs(b[0] - e) <= EDGE_S for e in edges)))
+  return out
 
 
 def health(f: Frames, define: CANDefine) -> list[str]:
@@ -181,12 +196,17 @@ def health(f: Frames, define: CANDefine) -> list[str]:
     if deny:
       abort.append(f"LaActDeny set on {deny} frames with mode {mode} requested")
   handed_back = int(((c["lat_active"] > 0) & (c["mode"] == 0)).sum())
-  out.append(f"steering faults: {int(c['fault'].sum())} frames; panda blocks this log: {f.blocked_delta}; " +
+  blocks = panda_blocks(f)
+  at_edge = sum(n for _, n, edge in blocks if edge)
+  engaged = [(t, n) for t, n, edge in blocks if not edge]
+  out.append(f"steering faults: {int(c['fault'].sum())} frames; panda blocks: {at_edge} at engage/disengage, " +
+             f"{sum(n for _, n in engaged)} otherwise; " +
              f"hand-backs (mode 0 while engaged): {handed_back} frames")
   if c["fault"].sum():
     abort.append("carState steering fault")
-  if f.blocked_delta:
-    abort.append(f"panda blocked {f.blocked_delta} messages; replay the route before trusting anything else")
+  if engaged:
+    abort.append("panda blocked messages away from any engage/disengage at t=" +
+                 ", ".join(f"{t:.1f}s ({n})" for t, n in engaged) + "; find out what before trusting anything else")
   out += [f"ABORT CONDITION: {a}" for a in abort] or ["no abort condition hit"]
   return out
 
@@ -248,7 +268,8 @@ def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
 
 def steady_holds(f: Frames) -> list[dict]:
   """The flat part of every maneuver hold: request steady within 3% for STEADY_MIN_S, hands off,
-  measured over its last STEADY_TAIL_S."""
+  measured over its last STEADY_TAIL_S. A hold is settled only if the truck itself stopped moving
+  across that tail; otherwise its ratio is lag, not delivery."""
   c = f.cols
   out = []
   for a, b in _runs((c["maneuver"] > 0) & (c["lat_active"] > 0)):
@@ -266,12 +287,15 @@ def steady_holds(f: Frames) -> list[dict]:
       sl = slice(tail, fb)
       req = float(np.median(c["plan"][sl]))
       got = float(np.median(c["kappa"][sl]))
+      edge = max((fb - tail) // 4, 1)
+      drift = abs(float(np.median(c["kappa"][fb - edge:fb]) - np.median(c["kappa"][tail:tail + edge])))
       v = float(np.median(c["v"][sl]))
       pa = float(np.median(np.abs(c["path_angle"][sl])))
       out.append({"label": f.labels[fa], "mode": int(np.median(c["mode"][sl])), "v": v, "request": req,
                   "delivered": got, "ratio": got / req if req else math.nan, "path_angle": pa,
                   "wheel": float(np.median(np.abs(c["wheel"][sl]))),
                   "plant": abs(got) / (pa / max(v, 0.5)) if pa > 1e-3 else math.nan,
+                  "settled": drift < SETTLED_DRIFT * abs(req),
                   "lim": Counter(int(x) for x in c["lim"][sl] if not math.isnan(x)).most_common(1)})
   return out
 
@@ -288,12 +312,17 @@ def delivery(f: Frames) -> list[str]:
     return ["no steady maneuver holds in these logs (run the Ford suite in Lateral Maneuver Mode)"]
   lsf = getattr(f.tuning, "lowSpeedFactor", 0.0) or 1.0
   out = [f"{'maneuver':>28} {'mode':>5} {'v':>5} {'request':>8} {'truck':>8} {'ratio':>6} {'path ang':>9} " +
-         f"{'wheel':>6} {'plant k':>8}"]
+         f"{'wheel':>6} {'plant k':>8} {'settled':>8}"]
   for h in holds:
     out.append(f"{h['label']:>28} {_mode_name(h['mode'], True):>5} {h['v']:5.1f} {h['request'] * 1e3:7.1f}m " +
-               f"{h['delivered'] * 1e3:7.1f}m {h['ratio']:6.2f} {h['path_angle']:9.3f} {h['wheel']:6.0f} {h['plant']:8.2f}")
+               f"{h['delivered'] * 1e3:7.1f}m {h['ratio']:6.2f} {h['path_angle']:9.3f} {h['wheel']:6.0f} {h['plant']:8.2f} " +
+               f"{'yes' if h['settled'] else 'NO':>8}")
   for mode in sorted({h["mode"] for h in holds}):
-    low = [h["ratio"] for h in holds if h["mode"] == mode and h["v"] <= LOW_SPEED_FACTOR_MAX_V and h["ratio"] > 0]
+    mine = [h for h in holds if h["mode"] == mode and h["v"] <= LOW_SPEED_FACTOR_MAX_V and h["ratio"] > 0]
+    low = [h["ratio"] for h in mine if h["settled"]]
+    if len(low) < len(mine):
+      out.append(f"{_mode_name(mode)}: {len(mine) - len(low)} hold(s) ended with the truck still turning in; " +
+                 "left out of the factor below")
     if len(low) < 2:
       continue
     r = float(np.median(low))
@@ -345,7 +374,8 @@ def main():
     raise SystemExit("no LateralMotionControl2 frames found: is this a CAN FD Ford in angle or curvature mode?")
   define = CANDefine(DBC_NAME)
   t = f.tuning
-  print(f"{f.files} log(s), {len(f)} steering frames, yaw bias {f.yaw_bias:+.4f} rad/s")
+  bias = f"yaw bias {f.yaw_bias:+.4f} rad/s" if f.yaw_bias else "yaw bias not estimated (under 5 s of straight hands-off driving)"
+  print(f"{f.files} log(s), {len(f)} steering frames, {bias}")
   if t is not None:
     print(f"primary control {t.primaryControl}, low/high speed factor {t.lowSpeedFactor:.2f}/{t.highSpeedFactor:.2f}, " +
           f"extended mode test {getattr(t, 'extendedModeTest', False)}")

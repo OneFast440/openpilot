@@ -115,21 +115,39 @@ def _sweep(peak: float, rise_s: float = 6.0) -> Action:
 # Ford PSCM characterization (see FORD_PSCM.md). Aimed at the low-speed wall: the PSCM follows the
 # LateralMotionControl2 path angle slowly, and tight low-speed turns are where that shows. Each
 # level stays inside the 0.52 rad path-angle signal at its speed with the default gain schedule:
-# kappa = accel / v^2 and path_angle ~ kappa * v * 1.3, so 12 mph tops out at 1.5 m/s^2.
+# kappa = accel / v^2 and path_angle ~ kappa * v * 1.3.
+#
+# A hold only measures delivery once the truck has finished turning in. On the first closed-course
+# run the wheel came in at about 30 deg/s, so a 2.5 m/s^2 hold at 20 mph (112 deg of wheel) needs
+# about 4 s just to arrive. Each hold is sized for that with 50% margin, plus 3 s to measure.
+_F150_WHEELBASE = 3.69          # m
+_F150_STEER_RATIO = 17.0
+_TURN_IN_RATE = 30.0            # deg/s at the steering wheel, measured
+_MEASURE_S = 3.0
+
+# Ford ACC will not set below 15 mph, so 16 mph is the slowest the suite can hold.
+FORD_SPEEDS_MPH = (20, 16)
+
+
+def _ford_hold_s(mph: int, accel: float) -> float:
+  v = mph * CV.MPH_TO_MS
+  wheel_deg = np.degrees(abs(accel) / v ** 2 * _F150_WHEELBASE * _F150_STEER_RATIO)
+  return round(1.5 * wheel_deg / _TURN_IN_RATE + _MEASURE_S, 1)
+
+
 def _ford_holds(mph: int, accels: tuple[float, ...]) -> list[Maneuver]:
-  return [Maneuver(f"hold {sign * accel:+.1f}m/s^2 {mph}mph", [_hold(sign * accel), Action([0.0], [1.5])],
+  return [Maneuver(f"hold {sign * accel:+.1f}m/s^2 {mph}mph",
+                   [_hold(sign * accel, hold_s=_ford_hold_s(mph, accel)), Action([0.0], [1.5])],
                    repeat=1, initial_speed=mph * CV.MPH_TO_MS)
           for accel in accels for sign in (1.0, -1.0)]
 
 
-# Fastest first: the suite waits at each speed until it is held, so if the truck's cruise cannot
-# hold 12 mph, everything else has already run by the time it stalls there.
+# Fastest first, gentlest first within a speed: the first maneuvers need the least room.
 FORD_PSCM_MANEUVERS = (
   _ford_holds(20, (1.0, 2.0, 2.5)) +
-  _ford_holds(16, (1.0, 2.0)) +
+  _ford_holds(16, (1.0, 1.5, 2.0)) +
   [Maneuver(f"sweep {sign * 2.5:+.1f}m/s^2 16mph", [_sweep(sign * 2.5), Action([0.0], [1.5])],
-            repeat=1, initial_speed=16. * CV.MPH_TO_MS) for sign in (1.0, -1.0)] +
-  _ford_holds(12, (1.0, 1.5))
+            repeat=1, initial_speed=16. * CV.MPH_TO_MS) for sign in (1.0, -1.0)]
 )
 
 
@@ -199,10 +217,13 @@ def main():
           alert_msg.alertDebug.alertText1 = f'Active {accel:+.1f}m/s² {max(action_remaining, 0):.1f}s'
         alert_msg.alertDebug.alertText2 = maneuver.description
       elif aborted_cnt > 0:
+        # name the next maneuver while the driver lines up, so they know which way it will turn
         aborted_cnt -= 1
         alert_msg.alertDebug.alertText1 = abort_reason
+        alert_msg.alertDebug.alertText2 = f'next: {maneuver.description}'
       elif not (abs(v_ego - maneuver.initial_speed) < MAX_SPEED_DEV and sm['carControl'].latActive):
         alert_msg.alertDebug.alertText1 = f'Set speed to {maneuver.initial_speed * CV.MS_TO_MPH:0.0f} mph'
+        alert_msg.alertDebug.alertText2 = f'next: {maneuver.description}'
       elif maneuver._ready_cnt > 0:
         ready_time = max(TIMER - maneuver._ready_cnt * DT_MDL, 0)
         alert_msg.alertDebug.alertText1 = f'Starting: {int(ready_time) + 1}'
