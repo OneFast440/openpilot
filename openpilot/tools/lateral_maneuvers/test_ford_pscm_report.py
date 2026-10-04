@@ -95,7 +95,9 @@ class TestFordPSCMReport:
     f.panda = [(0.0, "elm327", 0, False), (0.1, "elm327", 14, False),   # before the Ford mode: not ours
                (0.2, "ford", 0, False), (5.0, "ford", 0, True),
                (9.0, "ford", 0, True), (9.1, "ford", 4, False),         # the brake race
-               (20.0, "ford", 4, True), (30.0, "ford", 6, True)]        # engaged, no edge near
+               (20.0, "ford", 4, True), (29.9, "ford", 4, True),
+               (30.0, "ford", 6, True),                                 # engaged, no edge near
+               (1e4, "ford", 9, True)]                                  # next log: not a block
     assert panda_blocks(f) == [(9.1, 4, True), (30.0, 2, False)]
     text = "\n".join(health(f, CANDefine(DBC_NAME)))
     assert "4 at engage/disengage, 2 otherwise" in text
