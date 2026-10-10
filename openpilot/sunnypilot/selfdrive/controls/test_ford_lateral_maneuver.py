@@ -43,22 +43,21 @@ class TestFordLateralUnderManeuvers:
     assert all(abs(c - 0.01) < 1e-6 for c in curvatures)
 
   def test_maneuver_replaces_the_prediction(self):
-    """On an empty lot the model predicts straight ahead; the Ford controllers blend that with the
-    planner, which would shrink every maneuver. The prediction must be the maneuver."""
+    """On an empty lot the model predicts straight ahead; the angle controller blends that 50/50
+    with the planner, which would halve every maneuver. The prediction must be the maneuver."""
     curvatures = _ford_lateral(FakeSM(maneuver_curvature=0.05, model_curvature=0.0))
     assert len(curvatures) == 33
     assert all(abs(c - 0.05) < 1e-6 for c in curvatures)
 
   def test_maneuver_blend_is_a_no_op_in_the_controller(self):
-    """End to end through the real angle controller, on a gentle maneuver the blend still applies
-    to: with the maneuver as the prediction the request is the maneuver, and with a straight-ahead
-    prediction it would have gone out at half size."""
+    """End to end through the real angle controller: with the maneuver as the prediction, the
+    requested curvature is the maneuver, not half of it."""
     from opendbc.car.ford.values import CAR
     from opendbc.sunnypilot.car.ford.lateral_angle_ext import LateralAngleExt
     from opendbc.sunnypilot.car.ford.tests.helpers import make_actuators, make_car_params, make_cc, make_cc_sp, make_cs
     from opendbc.sunnypilot.car.ford.values_ext import PrimaryLateralControl
     CP, CP_SP = make_car_params(CAR.FORD_F_150_MK14, mode=PrimaryLateralControl.angle)
-    kappa, v_ego = 0.004, 6.0   # 0.14 m/s^2 and a 250 m radius: below both blend fades
+    kappa, v_ego = 0.02, 6.0
     out = {}
     for label, sm in (("fixed", FakeSM(maneuver_curvature=kappa)), ("model only", None)):
       ctrl = LateralAngleExt(CP, CP_SP)

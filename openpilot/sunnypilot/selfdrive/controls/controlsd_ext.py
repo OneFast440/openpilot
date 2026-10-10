@@ -129,11 +129,11 @@ class ControlsExt(ModelStateBase):
     model = sm['modelV2']
     v_ego = max(sm['carState'].vEgo, 0.01)
     dest.modelCurvatures = [float(z) / v_ego for z in model.orientationRate.z]
-    # Lateral Maneuver Mode replaces the planner's curvature, but both Ford controllers also blend
-    # in the model's predicted curvature (angle mode only on gentle curves). On an empty lot the
-    # model predicts straight ahead, so scripted maneuvers would go out undersized. Predict the
-    # maneuver itself instead: the blend is then a no-op and the maneuver is what the controller is
-    # asked to follow.
+    # Lateral Maneuver Mode replaces the planner's curvature, but the Ford angle controller also
+    # blends in the model's predicted curvature (50/50 at the time of writing). On an empty lot the
+    # model predicts straight ahead, so every scripted maneuver would go out at about half size.
+    # Predict the maneuver itself instead: the blend is then a no-op and the maneuver is what the
+    # controller is asked to follow.
     if sm.valid['lateralManeuverPlan']:
       # the Ford controller only uses a prediction of the full model horizon (33 points)
       horizon = len(model.orientationRate.z) or 33
