@@ -244,6 +244,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordSatObserver_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordDeliveryCompensation_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordCurveLaneKeeping_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"FordTurnInLead_ang", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"FordLatCtlExtendedTest", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     // curvature mode
     {"FordHumanTurnDetection_curv", {PERSISTENT | BACKUP, BOOL, "1"}},

@@ -419,6 +419,9 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # Pull the model's planned line back toward the lane-line centre in curves, past a deadband,
     # when both lane lines are trusted. From FordCurveLaneKeeping_ang. Default off.
     curveLaneKeeping @18 :Bool;
+    # Seconds of carControl's rate of change added to the command, so turns start and release
+    # sooner without raising the steady state. From FordTurnInLead_ang, [0.0, 0.6], 0 is off.
+    turnInLead @19 :Float32;
   }
 
   struct FordLongitudinalTuning {

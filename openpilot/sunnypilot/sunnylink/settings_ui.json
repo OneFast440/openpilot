@@ -2318,6 +2318,27 @@
           ]
         },
         {
+          "key": "FordTurnInLead_ang",
+          "widget": "option",
+          "title": "Turn-in Lead (Angle)",
+          "description": "Starts turns and releases them sooner without making them tighter. Adds this many seconds of the planned steering's own rate of change, so the truck gets ahead of a curve that is building or unwinding, and adds nothing once the curve is steady, unlike raising the speed factors, which also hold every curve tighter than planned. Capped, off on straight road, and off while you steer or change lanes. 0 is off; try 0.3 first.",
+          "min": 0.0,
+          "max": 0.6,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "FordCurveLaneKeeping_ang",
           "widget": "toggle",
           "title": "Curve Lane Keeping (Angle)",

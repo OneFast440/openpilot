@@ -24,6 +24,7 @@ from opendbc.sunnypilot.car.ford.values_ext import (
   LANE_POSITIONING_GAIN_RANGE,
   LOW_SPEED_FACTOR_RANGE,
   PATH_OFFSET_RANGE,
+  TURN_IN_LEAD_RANGE,
   PrimaryLateralControl,
 )
 
@@ -61,6 +62,13 @@ DESCRIPTIONS = {
     'so the car runs wide and you add the rest. This scales the steering command by whatever ' +
     'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
     'whenever you touch the wheel. Needs Detect Steering Saturation on.'
+  ),
+  'turn_in_lead': tr_noop(
+    'Starts turns and releases them sooner without making them tighter. Adds this many seconds of ' +
+    'the planned steering\'s own rate of change, so the truck gets ahead of a curve that is building ' +
+    'or unwinding, and adds nothing once the curve is steady, unlike raising the speed factors, which ' +
+    'also hold every curve tighter than planned. Capped, off on straight road, and off while you ' +
+    'steer or change lanes. 0 is off; try 0.3 first.'
   ),
   'curve_lane_keeping': tr_noop(
     'Keeps the truck off the inside line in curves. The driving model plans a line that cuts curves, ' +
@@ -174,6 +182,8 @@ class FordSettings(BrandSettings):
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+    self.turn_in_lead = self._slider(
+      tr_noop("Turn-in Lead (s)"), "FordTurnInLead_ang", "turn_in_lead", TURN_IN_LEAD_RANGE)
     self.curve_lane_keeping = self._toggle(
       tr_noop("Curve Lane Keeping"), "FordCurveLaneKeeping_ang", "curve_lane_keeping")
     self.extended_mode_test = self._toggle(
@@ -214,6 +224,7 @@ class FordSettings(BrandSettings):
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_compensation,
+      self.turn_in_lead,
       self.curve_lane_keeping,
       self.extended_mode_test,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
