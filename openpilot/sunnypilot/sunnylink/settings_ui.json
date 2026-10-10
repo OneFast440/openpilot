@@ -2318,6 +2318,24 @@
           ]
         },
         {
+          "key": "FordCurveLaneKeeping_ang",
+          "widget": "toggle",
+          "title": "Curve Lane Keeping (Angle)",
+          "description": "Keeps the truck off the inside line in curves. The driving model plans a line that cuts curves, on logged drives 0.3-0.9 m inside the lane centre, which puts a full-size truck's inside tyres on the line. This pulls the steering back toward the centre of the detected lane lines, by a little, only in curves, only when both lane lines are clearly seen, and never while you are steering or changing lanes. Straight-road steering is unchanged.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "FordLatCtlExtendedTest",
           "widget": "toggle",
           "title": "Extended Mode Test, One Drive (Angle)",

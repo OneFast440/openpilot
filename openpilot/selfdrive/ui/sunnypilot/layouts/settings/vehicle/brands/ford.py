@@ -62,6 +62,13 @@ DESCRIPTIONS = {
     'cancels the shortfall it measures. It only ever adds, it is capped, and it fades out ' +
     'whenever you touch the wheel. Needs Detect Steering Saturation on.'
   ),
+  'curve_lane_keeping': tr_noop(
+    'Keeps the truck off the inside line in curves. The driving model plans a line that cuts curves, ' +
+    'on logged drives 0.3-0.9 m inside the lane centre, which puts a full-size truck\'s inside tyres on ' +
+    'the line. This pulls the steering back toward the centre of the detected lane lines, by a little, ' +
+    'only in curves, only when both lane lines are clearly seen, and never while you are steering or ' +
+    'changing lanes. Straight-road steering is unchanged.'
+  ),
   'extended_mode_test': tr_noop(
     'Closed-course test only. Asks the power steering module for its Extended path-following ' +
     'mode instead of the Limited mode openpilot always uses. It switches itself off when the ' +
@@ -167,6 +174,8 @@ class FordSettings(BrandSettings):
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+    self.curve_lane_keeping = self._toggle(
+      tr_noop("Curve Lane Keeping"), "FordCurveLaneKeeping_ang", "curve_lane_keeping")
     self.extended_mode_test = self._toggle(
       tr_noop("Extended Mode Test (One Drive)"), "FordLatCtlExtendedTest", "extended_mode_test")
 
@@ -205,6 +214,7 @@ class FordSettings(BrandSettings):
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_compensation,
+      self.curve_lane_keeping,
       self.extended_mode_test,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
       # controlled curvature mode; it is listed in both groups now that it means the same in both.
