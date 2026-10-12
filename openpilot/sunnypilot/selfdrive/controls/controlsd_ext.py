@@ -6,8 +6,6 @@ See the LICENSE.md file in the root directory for more details.
 """
 import time
 
-import numpy as np
-
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log, custom
 
@@ -27,11 +25,6 @@ FORD_PRIMARY_LATERAL_STOCK = 0
 # than a .raw read so a reordered log.capnp enum cannot silently change the wire meaning.
 LANE_CHANGE_STATE = {'off': 0, 'preLaneChange': 1, 'laneChangeStarting': 2, 'laneChangeFinishing': 3}
 LANE_CHANGE_DIRECTION = {'none': 0, 'left': 1, 'right': 2}
-
-# Ford angle mode's curve lane keeping looks this far ahead along the model's plan, in time at
-# the current speed, bounded so it stays inside the lane lines' useful range.
-FORD_LANE_LOOKAHEAD_S = 1.5
-FORD_LANE_LOOKAHEAD_RANGE_M = (10.0, 60.0)
 
 
 class ControlsExt(ModelStateBase):
@@ -157,22 +150,6 @@ class ControlsExt(ModelStateBase):
       dest.laneLineRightY = float(model.laneLines[2].y[0]) if len(model.laneLines[2].y) else 0.0
       dest.laneLineLeftProb = float(model.laneLineProbs[1])
       dest.laneLineRightProb = float(model.laneLineProbs[2])
-      ControlsExt.get_ford_lane_ahead(dest, model, v_ego)
-
-  @staticmethod
-  def get_ford_lane_ahead(dest, model, v_ego: float) -> None:
-    """Angle mode's curve lane keeping: the plan against the lane-line centre FORD_LANE_LOOKAHEAD_S
-    ahead. Measured here because the car controller only receives the lane lines at the truck."""
-    left, right = model.laneLines[1], model.laneLines[2]
-    if not (len(left.x) and len(left.x) == len(left.y) and len(right.x) and len(right.x) == len(right.y)
-            and len(model.position.x) and len(model.position.x) == len(model.position.y)):
-      return
-    distance = float(np.clip(v_ego * FORD_LANE_LOOKAHEAD_S, *FORD_LANE_LOOKAHEAD_RANGE_M))
-    left_y = float(np.interp(distance, left.x, left.y))
-    right_y = float(np.interp(distance, right.x, right.y))
-    dest.planLaneOffsetAhead = float(np.interp(distance, model.position.x, model.position.y)) - (left_y + right_y) / 2.0
-    dest.laneWidthAhead = right_y - left_y
-    dest.laneLookahead = distance
 
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:

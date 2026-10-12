@@ -29,7 +29,6 @@ from opendbc.sunnypilot.car.ford.values_ext import (
   LANE_CHANGE_FACTOR_RANGE,
   LANE_POSITIONING_GAIN_RANGE,
   LOW_SPEED_FACTOR_RANGE,
-  TURN_IN_LEAD_RANGE,
   PATH_OFFSET_RANGE,
   PrimaryLateralControl,
 )
@@ -58,8 +57,6 @@ class FordPanelMici:
                                            LANE_CHANGE_FACTOR_RANGE)
     self.sat_observer = BigParamControl(tr("detect steering saturation"), "FordSatObserver_ang")
     self.delivery_comp = BigParamControl(tr("correct steering shortfall"), "FordDeliveryCompensation_ang")
-    self.turn_in_lead = _stepper(tr("turn-in lead (s)"), "FordTurnInLead_ang", TURN_IN_LEAD_RANGE)
-    self.curve_lane_keeping = BigParamControl(tr("curve lane keeping"), "FordCurveLaneKeeping_ang")
     self.extended_mode_test = BigParamControl(tr("extended mode test (one drive)"), "FordLatCtlExtendedTest")
 
     # curvature mode
@@ -89,8 +86,6 @@ class FordPanelMici:
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_comp,
-      self.turn_in_lead,
-      self.curve_lane_keeping,
       self.extended_mode_test,
       self.human_turn,
     ]

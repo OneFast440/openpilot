@@ -416,12 +416,6 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # Closed-course A/B: request LatCtl_D2_Rq = 2 (PathFollowingExtendedMode) instead of 1 in angle
     # mode. From FordLatCtlExtendedTest, which clears itself when the car goes offroad.
     extendedModeTest @17 :Bool;
-    # Pull the model's planned line back toward the lane-line centre in curves, past a deadband,
-    # when both lane lines are trusted. From FordCurveLaneKeeping_ang. Default off.
-    curveLaneKeeping @18 :Bool;
-    # Seconds of carControl's rate of change added to the command, so turns start and release
-    # sooner without raising the steady state. From FordTurnInLead_ang, [0.0, 0.6], 0 is off.
-    turnInLead @19 :Float32;
   }
 
   struct FordLongitudinalTuning {
@@ -463,13 +457,6 @@ struct CarControlSP @0xa5cd762cd951a455 {
 
     # selfdriveState.alertType, for the cluster's driver-monitoring messaging
     alertType @9 :Text;
-
-    # angle mode's curve lane keeping: where the model's plan sits against the lane-line centre a
-    # short time ahead (model frame, right positive), the lane width there, and that distance.
-    # laneLookahead is 0 when the lane lines or the plan are missing.
-    planLaneOffsetAhead @10 :Float32;   # m
-    laneWidthAhead @11 :Float32;        # m
-    laneLookahead @12 :Float32;         # m
   }
 
   struct Param {
