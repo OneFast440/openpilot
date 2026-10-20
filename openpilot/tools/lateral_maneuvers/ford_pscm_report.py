@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from opendbc.can.dbc import DBC
-from opendbc.can.parser import get_raw_value, CANDefine
+from opendbc.can.parser import CANDefine
 from openpilot.tools.lib.logreader import LogReader
 
 DBC_NAME = "ford_lincoln_base_pt"
@@ -56,7 +56,7 @@ def _decoder(dbc: DBC, msg_name: str):
   def decode(dat: bytes) -> dict[str, float]:
     out = {}
     for name, sig in msg.sigs.items():
-      raw = get_raw_value(dat, sig)
+      raw = sig.get_raw_value(dat)
       if sig.is_signed and raw >= (1 << (sig.size - 1)):
         raw -= 1 << sig.size
       out[name] = raw * sig.factor + sig.offset

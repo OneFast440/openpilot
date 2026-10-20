@@ -18,11 +18,18 @@ class HudRendererSP(HudRenderer):
   def __init__(self):
     super().__init__()
     self.blind_spot_indicators = BlindSpotIndicators()
+    self._sp_engaged: bool = False
     self.brake_lights_on = False
 
   def _update_state(self) -> None:
     super()._update_state()
     self.blind_spot_indicators.update()
+
+    sp_engaged = ui_state.engaged
+    if sp_engaged != self._sp_engaged:
+      self._chestnut_fade_time = rl.get_time() if sp_engaged else 0
+    self._sp_engaged = sp_engaged
+
     self.brake_lights_on = self._brake_lights_lit()
 
   @staticmethod
