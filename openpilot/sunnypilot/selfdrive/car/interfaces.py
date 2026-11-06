@@ -152,6 +152,7 @@ def initialize_params(params) -> list[dict[str, Any]]:
   keys.extend([
     "ToyotaEnforceStockLongitudinal",
     "ToyotaStopAndGoHack",
+    "ToyotaTSS2Smooth",
   ])
 
   # A key the running params library does not know about raises UnknownKeyName, which would take
