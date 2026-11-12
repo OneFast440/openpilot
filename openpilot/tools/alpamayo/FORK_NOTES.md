@@ -7,8 +7,9 @@
 This directory is comma's offline prototype for running
 [NVIDIA Alpamayo 2 Edge](https://huggingface.co/nvidia/Alpamayo2-Edge) on a Chestnut. It is
 imported unchanged from `commaai/openpilot`, branch `alpamayo2-edge-egpu`, at `fe68e1d`.
-`README.md` is comma's and is the procedure they tested. This note covers only what is different
-on this fork.
+`README.md` is comma's and is the procedure they tested. This note covers what is different on
+this fork: where tinygrad comes from, and three files added here (`score.py`, `rescale.py` and
+their tests in `test_score.py`).
 
 ## What it does and does not do
 
@@ -50,10 +51,69 @@ export PYTHONPATH="/data/alpamayo/tinygrad:$PWD:$PWD/opendbc_repo:$PWD/msgq_repo
 - Your own drives are already on the device. Each `/data/media/0/realdata/<route>--<segment>/`
   holds the `rlog.zst`, `fcamera.hevc` and `ecamera.hevc` that `replay.py` takes.
 
+## Scoring a run
+
+comma's tool reports how fast the model runs and prints a trajectory. `score.py`, added on this
+fork, says how that trajectory compares with what the truck did in the next 6.4 s of the same log.
+It needs only numpy and openpilot's log reader, so it runs in either Python environment.
+
+```bash
+python openpilot/tools/alpamayo/score.py --rlog /absolute/path/rlog.zst \
+  --input /tmp/alpamayo-openpilot.npz --report /tmp/alpamayo-chestnut.json
+```
+
+If the sample is within 6.4 s of the end of its segment, add the next segment's rlog with a second
+`--rlog`. `--output scores.json` also saves the numbers.
+
+| Line in the output | Meaning |
+| --- | --- |
+| Off the driven path | Sideways distance from the line the truck drove, + is left. This is the steering result. |
+| Ahead of the truck | How much farther along that line the prediction is than the truck was. This is speed, not steering. |
+| Alpamayo | The model's trajectory. |
+| hold speed and turn | The truck carrying on exactly as in its last second. A model has to beat this to be worth anything. |
+| openpilot plan | What openpilot's own model planned from the same camera frame. |
+
+Three things to keep in mind when reading it:
+
+- If openpilot was steering during those 6.4 s, the truck followed openpilot's plan, so that row
+  looks better than it deserves. The output prints how much of the window openpilot was steering.
+  Use stretches you drove by hand to compare the two models fairly.
+- One sample is an anecdote. Score a few dozen, curves included, before concluding anything. Each
+  one needs its own `replay.py` and `benchmark.py` run, and the benchmark reloads the model each
+  time.
+- The path is the device's, as in comma's packer, not the rear axle's the model was trained on.
+  In a tight turn the two differ a little.
+
+## The truck's speed
+
+comma's packer takes the ego motion from `deviceMotion`, and the localizer behind that message
+observes speed only through the cameras. On this truck that speed reads low. In the one log
+checked (build `9386beb`, the first 19 s of a drive) the camera-based path covered 51.6 m in 6.4 s
+where the truck's speed sensor gives 62.8 m and GPS 64.4 m: 18% short. A model told the truck is
+doing 8.4 m/s when it is doing 10.2 m/s is being tested on a wrong input.
+
+`score.py` checks this on every sample and says so. When it does, fix the sample and benchmark the
+fixed one:
+
+```bash
+python openpilot/tools/alpamayo/rescale.py --rlog /absolute/path/rlog.zst \
+  --input /tmp/alpamayo-openpilot.npz --output /tmp/alpamayo-openpilot-scaled.npz
+```
+
+`rescale.py` keeps the directions and takes the distances from `carState`. `score.py` recognises a
+rescaled sample and scores it in the truck's own scale. Whether the 18% holds later in a drive, or
+on other trucks, is not known: one short log.
+
 ## Status on this fork
 
-Imported and read, not run. The fork's lint passes on it, the files are byte-identical to comma's,
-and everything `replay.py` uses from openpilot exists in this tree under the same names
-(`FrameReader`, `LogReader`, `rot_from_euler`, and the `narrowRoadEncodeIdx`, `wideRoadEncodeIdx`,
-`deviceMotion` and `extrinsicsCalibration` messages). Nobody has executed it from this fork, on a
-Chestnut or anywhere else.
+comma's tool is imported and read, not run. The fork's lint passes on it, the files are
+byte-identical to comma's, and everything `replay.py` uses from openpilot exists in this tree under
+the same names (`FrameReader`, `LogReader`, `rot_from_euler`, and the `narrowRoadEncodeIdx`,
+`wideRoadEncodeIdx`, `deviceMotion` and `extrinsicsCalibration` messages). Nobody has executed it
+from this fork, on a Chestnut or anywhere else.
+
+`score.py` and `rescale.py` have unit tests (`test_score.py`) and were run on a real log from this
+truck for the driven path, the speed check and openpilot's plan. They have never seen a real
+Alpamayo trajectory, only stand-ins. They rebuild the ego history the way `replay.py` does and
+refuse to score if it does not match the packed sample, so a change in comma's packer shows up as
+an error, not as a wrong number.
