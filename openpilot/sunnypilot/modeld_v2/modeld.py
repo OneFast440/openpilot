@@ -36,7 +36,7 @@ from openpilot.common.transformations.camera import DEVICE_CAMERAS
 from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
 from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan, smooth_value
-from openpilot.selfdrive.modeld.modeld import ChestnutGpuState
+from openpilot.selfdrive.modeld.modeld import BIG_LAT_SMOOTH_SECONDS, ChestnutGpuState
 
 from openpilot.sunnypilot.modeld_v2.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState, get_curvature_from_output
 from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
@@ -75,6 +75,20 @@ def _find_driving_pkl(bundle):
   return None
 
 
+def get_lat_smooth_seconds(overrides: dict[str, str], chestnut: bool, generation: int | None) -> float:
+  """The bundle's lateral smoothing, raised to stock modeld's BIG_LAT_SMOOTH_SECONDS for a big model.
+
+  The model list now sends big models with 'lat' = .0, so without the floor a Chestnut bundle picked in the
+  model manager runs unsmoothed even though stock modeld smooths the same model. Only where
+  get_action_from_model actually smooths (generation >= 10): elsewhere the value would only lengthen the
+  lateral action time.
+  """
+  bundle_seconds = float(overrides.get('lat', ".0"))
+  if chestnut and generation is not None and generation >= 10:
+    return max(bundle_seconds, BIG_LAT_SMOOTH_SECONDS)
+  return bundle_seconds
+
+
 class FrameMeta:
   frame_id: int = 0
   timestamp_sof: int = 0
@@ -100,7 +114,7 @@ class ModelState(ModelStateBase):
     self.generation = model_bundle.generation if model_bundle is not None else None
     overrides = {override.key: override.value for override in model_bundle.overrides} if model_bundle else {}
 
-    self.LAT_SMOOTH_SECONDS = float(overrides.get('lat', ".0"))
+    self.LAT_SMOOTH_SECONDS = get_lat_smooth_seconds(overrides, chestnut, self.generation)
     self.LONG_SMOOTH_SECONDS = float(overrides.get('long', ".0"))
     self.MIN_LAT_CONTROL_SPEED = 0.3
     self.PLANPLUS_CONTROL: float = 1.0
