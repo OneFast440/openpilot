@@ -47,6 +47,8 @@ class FordPanelMici:
   def __init__(self):
     self.primary_control = BigMultiParamToggle(tr("primary lateral control"), "FordPrefLateralControl",
                                                [tr("stock"), tr("curvature"), tr("angle")])
+    # every mode, stock included
+    self.quick_release = BigParamControl(tr("quick release on disengage"), "FordQuickDisengageRelease")
 
     # angle mode
     self.low_speed_factor = _stepper(tr("low speed factor"), "FordLowSpeedFactor_ang", LOW_SPEED_FACTOR_RANGE)
@@ -111,7 +113,7 @@ class FordPanelMici:
     self._offroad_note = GreyBigButton("", tr("settings unlock when the car is off"))
 
     # angle and curvature share human_turn, so build the list without repeating it
-    self.widgets: list[Widget] = [self._offroad_note, self.primary_control]
+    self.widgets: list[Widget] = [self._offroad_note, self.primary_control, self.quick_release]
     for item in self.angle_items + self.curvature_items + self.always_items:
       if item not in self.widgets:
         self.widgets.append(item)
@@ -128,6 +130,7 @@ class FordPanelMici:
 
     self._offroad_note.set_visible(not offroad)
     self.primary_control.set_enabled(offroad)
+    self.quick_release.set_enabled(offroad)
 
     for item in self.angle_items:
       if item is self.human_turn:

@@ -41,6 +41,13 @@ DESCRIPTIONS = {
     'planner and anticipating curves. Angle steers with path_angle instead, which the module acts on immediately ' +
     'rather than filtering for up to a second.'
   ),
+  'quick_release': tr_noop(
+    'How fast the power steering module lets go of its torque whenever openpilot hands steering back to you. ' +
+    'Off sends what Ford\'s camera and upstream openpilot send, which on some 2021-23 F-150 data files leaves a ' +
+    'fading pull on the wheel for up to about 3.4 s. On asks for the module\'s fastest release, gone within about ' +
+    'half a second; where the module already releases that fast, nothing changes. Off keeps the slow fade, which ' +
+    'holds the truck on its line until your hands are on the wheel.'
+  ),
   # angle
   'low_speed_factor': tr_noop(
     'Scales the steering response below roughly 30 mph (50 km/h). Above 1.0 turns the wheel more, below 1.0 turns it less.'
@@ -153,6 +160,9 @@ class FordSettings(BrandSettings):
       param="FordPrefLateralControl",
       inline=False,
     )
+    # every mode, stock included
+    self.quick_release = self._toggle(
+      tr_noop("Quick Release On Disengage"), "FordQuickDisengageRelease", "quick_release")
 
     # angle mode
     self.low_speed_factor = self._slider(
@@ -224,6 +234,7 @@ class FordSettings(BrandSettings):
 
     self.items = [
       self.primary_control,
+      self.quick_release,
       *self.angle_items,
       *self.curvature_items,
       LineSeparatorSP(),
@@ -280,6 +291,8 @@ class FordSettings(BrandSettings):
     if self.primary_control.description != description:
       self.primary_control.set_description(description)
       self.primary_control.show_description(True)
+
+    self.quick_release.action_item.set_enabled(offroad)
 
     for index, item in enumerate(self.angle_items):
       item.set_visible(is_angle)

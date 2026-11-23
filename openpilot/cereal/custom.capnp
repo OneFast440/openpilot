@@ -422,6 +422,11 @@ struct CarParamsSP @0x80ae746ee2596b11 {
     # Closed-course A/B: request LatCtl_D2_Rq = 2 (PathFollowingExtendedMode) instead of 1 in angle
     # mode. From FordLatCtlExtendedTest, which clears itself when the car goes offroad.
     extendedModeTest @17 :Bool;
+
+    # every mode: LatCtlRampType_D_Rq of each frame that hands steering back (request 0), which
+    # sets how fast the PSCM releases its torque. 0 as Ford's camera and upstream openpilot send;
+    # 3, the module's fastest release, from FordQuickDisengageRelease.
+    releaseRampType @18 :UInt8;
   }
 
   struct FordLongitudinalTuning {

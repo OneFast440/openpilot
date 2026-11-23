@@ -244,6 +244,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // allowlist are derived from the same read, so changes need an onroad cycle.
     // 0 = stock openpilot, 1 = BluePilot curvature, 2 = BluePilot angle
     {"FordPrefLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
+    // every mode: ramp type 3 instead of 0 in the frames that hand steering back
+    {"FordQuickDisengageRelease", {PERSISTENT | BACKUP, BOOL, "0"}},
     // angle mode
     {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},

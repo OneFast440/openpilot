@@ -25,6 +25,14 @@ sections:
       label: Angle
     enablement: &id001
     - $ref: '#/macros/offroad'
+  - key: FordQuickDisengageRelease
+    widget: toggle
+    title: Quick Release On Disengage
+    description: How fast the power steering module lets go of its torque whenever openpilot hands steering back to you. Off sends
+      what Ford's camera and upstream openpilot send, which on some 2021-23 F-150 data files leaves a fading pull on the wheel for up
+      to about 3.4 s. On asks for the module's fastest release, gone within about half a second; where the module already releases
+      that fast, nothing changes. Off keeps the slow fade, which holds the truck on its line until your hands are on the wheel.
+    enablement: *id001
   - key: FordLowSpeedFactor_ang
     widget: option
     title: Low Speed Factor (Angle)

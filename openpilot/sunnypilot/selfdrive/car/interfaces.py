@@ -108,6 +108,7 @@ def initialize_params(params) -> list[dict[str, Any]]:
   # ford
   keys.extend([
     "FordPrefLateralControl",
+    "FordQuickDisengageRelease",
     "FordLowSpeedFactor_ang",
     "FordHighSpeedFactor_ang",
     "FordHighSpeedDampening_ang",
