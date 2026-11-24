@@ -369,6 +369,9 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   pcmCruiseSpeed @3 :Bool;
   intelligentCruiseButtonManagementAvailable @4 :Bool;
   enableGasInterceptor @5 :Bool;
+  # flat-road ceiling for controlsd's curvature clip, m/s^2; 0 keeps comma's 3.0. A car port sets it only where its
+  # panda enforces the same ceiling (Ford: FordHigherLateralAccel_ang, angle mode on a matched steering module).
+  maxLateralAccel @9 :Float32;
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
   fordLateralTuning @6 :FordLateralTuning;

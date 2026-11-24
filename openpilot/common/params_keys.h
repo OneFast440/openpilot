@@ -253,6 +253,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordLaneChangeFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordSatObserver_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordDeliveryCompensation_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
+    // angle mode on a matched steering module: a 4.0 m/s^2 lateral acceleration ceiling instead of comma's 3.0
+    {"FordHigherLateralAccel_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordLatCtlExtendedTest", {CLEAR_ON_MANAGER_START | CLEAR_ON_OFFROAD_TRANSITION, BOOL}},
     // curvature mode
     {"FordHumanTurnDetection_curv", {PERSISTENT | BACKUP, BOOL, "1"}},

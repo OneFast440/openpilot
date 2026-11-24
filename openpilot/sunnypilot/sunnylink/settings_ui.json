@@ -2354,6 +2354,24 @@
           ]
         },
         {
+          "key": "FordHigherLateralAccel_ang",
+          "widget": "toggle",
+          "title": "Higher Lateral Acceleration Limit (Angle)",
+          "description": "Lets openpilot ask for up to 4.0 m/s\u00b2 of sideways acceleration in curves (about 0.4 g) instead of comma's 3.0 m/s\u00b2, the ISO 11270 lane-keeping limit, so the truck can hold tighter curves at speed. Only on a power steering module openpilot recognizes, because the panda checks the higher limit with that module's own gain; on any other truck it does nothing. Lateral jerk and every other limit are unchanged. A wrong command can now turn the truck harder before you catch it, so keep your hands ready in curves.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 2
+            }
+          ],
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "FordLatCtlExtendedTest",
           "widget": "toggle",
           "title": "Extended Mode Test, One Drive (Angle)",

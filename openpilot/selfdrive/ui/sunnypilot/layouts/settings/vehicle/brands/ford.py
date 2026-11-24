@@ -82,6 +82,13 @@ DESCRIPTIONS = {
     'module is already refusing, which is what snaps the wheel back on the way out. It does not make the steering ' +
     'stronger. Off by default; try it on a road with real corners and watch for any hesitation mid-curve.'
   ),
+  'higher_lateral_accel': tr_noop(
+    'Lets openpilot ask for up to 4.0 meters per second squared of sideways acceleration in curves (about 0.4 g) ' +
+    'instead of comma\'s 3.0, the ISO 11270 lane-keeping limit, so the truck can hold tighter curves at speed. Only on ' +
+    'a power steering module openpilot recognizes, because the panda checks the higher limit with that module\'s own ' +
+    'gain; on any other truck it does nothing. Lateral jerk and every other limit are unchanged. A wrong command can ' +
+    'now turn the truck harder before you catch it, so keep your hands ready in curves.'
+  ),
   # curvature
   'human_turn': tr_noop(
     'Hand steering back to you while you hold a real turn, instead of winding up a command the power steering ' +
@@ -177,6 +184,8 @@ class FordSettings(BrandSettings):
       tr_noop("Detect Steering Saturation"), "FordSatObserver_ang", "sat_observer")
     self.delivery_compensation = self._toggle(
       tr_noop("Correct Steering Shortfall"), "FordDeliveryCompensation_ang", "delivery_compensation")
+    self.higher_lateral_accel = self._toggle(
+      tr_noop("Higher Lateral Acceleration Limit"), "FordHigherLateralAccel_ang", "higher_lateral_accel")
     self.extended_mode_test = self._toggle(
       tr_noop("Extended Mode Test (One Drive)"), "FordLatCtlExtendedTest", "extended_mode_test")
 
@@ -215,6 +224,7 @@ class FordSettings(BrandSettings):
       self.lane_change_factor_ang,
       self.sat_observer,
       self.delivery_compensation,
+      self.higher_lateral_accel,
       self.extended_mode_test,
       # Shared with curvature mode. Angle mode used to hard-wire this on, so the toggle only ever
       # controlled curvature mode; it is listed in both groups now that it means the same in both.
